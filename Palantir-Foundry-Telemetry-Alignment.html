@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Palantir Foundry — Machine Telemetry Domain Alignment</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 40px; color: #222; }
+  h1 { color: #1a1a2e; font-size: 22px; border-bottom: 3px solid #e63946; padding-bottom: 8px; }
+  h2 { color: #1a1a2e; font-size: 16px; margin-top: 32px; border-left: 4px solid #e63946; padding-left: 10px; }
+  h3 { color: #457b9d; font-size: 14px; margin-top: 16px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }
+  th { background-color: #1a1a2e; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #ddd; font-size: 12px; vertical-align: top; }
+  tr:nth-child(even) { background-color: #f8f9fa; }
+  .layer-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+  .bronze { background: #cd7f32; color: white; }
+  .silver { background: #a8a9ad; color: white; }
+  .gold { background: #d4a017; color: white; }
+  .object-box { background: #f0f4f8; border: 1px solid #ccd6e0; border-radius: 6px; padding: 12px; margin: 10px 0; font-family: monospace; font-size: 12px; white-space: pre; }
+  .section-intro { background: #eaf4fb; border-left: 4px solid #457b9d; padding: 8px 12px; margin: 8px 0 16px 0; font-size: 12px; color: #333; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 60px 0 40px 0; }
+  .cover h1 { border: none; font-size: 28px; }
+  .cover p { color: #555; font-size: 14px; }
+  .toc { background: #f8f9fa; border: 1px solid #ddd; padding: 20px 30px; margin: 30px 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 20px; line-height: 2; }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>Palantir Foundry</h1>
+  <h2 style="border:none; font-size:20px; color:#457b9d;">Machine Telemetry Domain Alignment</h2>
+  <p>Architecture Reference — Industrial Equipment Telematics Platform</p>
+  <p style="color:#999; font-size:11px;">Prepared by Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li>Foundry Architecture Overview</li>
+    <li>Data Refinement, Ownership & Enrichment</li>
+    <li>Code Repository — Engineering Deep Dive</li>
+    <li>Pipeline Builder — Visual Transform Tool</li>
+    <li>Schema Contracts & Data Quality Expectations</li>
+    <li>Ontology Object Model</li>
+    <li>Domain Alignment: Engine</li>
+    <li>Domain Alignment: Fuel & Emissions (DPF/DEF)</li>
+    <li>Domain Alignment: Hydraulics</li>
+    <li>Domain Alignment: Transmission & Drivetrain</li>
+    <li>Domain Alignment: Undercarriage</li>
+    <li>Domain Alignment: Electrical System</li>
+    <li>Domain Alignment: Productivity & Operator Behavior</li>
+    <li>Domain Alignment: Location & Geofencing</li>
+    <li>Domain Alignment: Structural & Safety</li>
+    <li>Domain Alignment: Vibration & Acoustic</li>
+    <li>Domain Alignment: Fluid Analysis</li>
+    <li>Domain Alignment: OTA / ECM</li>
+    <li>Parts Replacement Mapping</li>
+    <li>Machine Domain API Reference</li>
+  </ol>
+</div>
+
+<!-- SECTION 1 -->
+<h1>1. Foundry Architecture Overview</h1>
+<div class="section-intro">
+  All telemetric domains follow a three-layer data organization inside Palantir Foundry, flowing from raw ingestion through to business-ready objects consumed by the Customer Portal, NBO/NBA Engine, and Commerce Platform.
+</div>
+
+<table>
+  <tr><th>Layer</th><th>Name</th><th>Description</th><th>Dataset Path</th></tr>
+  <tr><td><span class="layer-badge bronze">BRONZE</span></td><td>Raw Layer</td><td>Data exactly as received — no transformations, no cleanup. Source of truth for replay.</td><td>/foundry/data/bronze/{domain}_raw</td></tr>
+  <tr><td><span class="layer-badge silver">SILVER</span></td><td>Cleaned Layer</td><td>Deduplicated, validated, typed correctly, enriched with machine/customer metadata.</td><td>/foundry/data/silver/{domain}_cleaned</td></tr>
+  <tr><td><span class="layer-badge gold">GOLD</span></td><td>Business-Ready Layer</td><td>Aggregated, scored, and joined. What the portal, NBO/NBA engine and APIs consume directly.</td><td>/foundry/data/gold/{domain}_enriched</td></tr>
+</table>
+
+<div class="section-intro" style="margin-top:14px;">
+  <strong>Naming note — Bronze/Silver/Gold vs alternatives:</strong> The Bronze/Silver/Gold naming originates from Databricks' medallion architecture and is widely understood in data engineering. It is not mandated by Foundry — teams choose their own dataset path conventions. The table below shows equivalent naming patterns in use across the industry. The concept (and its three invariants) matters more than the label.
+</div>
+
+<table>
+  <tr>
+    <th style="width:20%">This Platform</th>
+    <th style="width:20%">Common Alternative</th>
+    <th style="width:20%">Warehouse / Zone</th>
+    <th style="width:20%">IoT / Industrial</th>
+    <th style="width:20%">Data Mesh</th>
+  </tr>
+  <tr>
+    <td><span class="layer-badge bronze">BRONZE</span></td>
+    <td>Raw</td>
+    <td>Landing / Staging</td>
+    <td>Raw / Ingested</td>
+    <td>Source</td>
+  </tr>
+  <tr>
+    <td><span class="layer-badge silver">SILVER</span></td>
+    <td>Refined / Cleansed</td>
+    <td>Core / Conformed</td>
+    <td>Validated / Standardized</td>
+    <td>Harmonized / Domain</td>
+  </tr>
+  <tr>
+    <td><span class="layer-badge gold">GOLD</span></td>
+    <td>Curated / Enriched</td>
+    <td>Mart / Published</td>
+    <td>Operational / Serving</td>
+    <td>Product / Consumption</td>
+  </tr>
+  <tr style="background:#f8f9fa;">
+    <td colspan="5" style="font-size:11px;color:#555;padding:8px 10px;">
+      <strong>The three invariants — regardless of naming:</strong>
+      &nbsp; Layer 1: immutable, full-fidelity, replayable (never transform here).
+      &nbsp; Layer 2: clean, MDM-resolved, unit-normalized, quarantine-routed (safe to query, not yet business-ready).
+      &nbsp; Layer 3: enriched, scored, aggregated, application-ready (what the Ontology and APIs consume directly).
+    </td>
+  </tr>
+</table>
+
+<h3>Where Are the Layers Actually Stored — Foundry vs S3</h3>
+<div class="section-intro">
+  The short answer: <strong>inside Foundry, which physically stores on S3 underneath</strong>. Foundry manages its own dataset storage layer — you write to a Foundry dataset path, Foundry handles the physical storage in its own S3 bucket. You never interact with S3 directly.
+</div>
+
+<div class="object-box">Your Code Repository transform writes:
+  Output("/silver/engine_telemetry_cleaned")
+         │
+         ▼
+Foundry dataset service manages automatically:
+  ├─ Physical storage: Foundry-managed S3 bucket (not your bucket)
+  ├─ Format: Parquet files, columnar, Foundry-partitioned
+  ├─ Versioning: every write = new transaction; old versions retained (time travel)
+  └─ Lineage metadata: stored alongside the dataset automatically
+
+You never see or access:
+  s3://foundry-internal-bucket/datasets/ri.foundry.main.dataset.abc123/...
+  (Foundry's internal S3 paths are not exposed)</div>
+
+<table>
+  <tr><th>Question</th><th>Answer</th></tr>
+  <tr>
+    <td>Can I read Bronze files directly from S3?</td>
+    <td>No — Foundry's S3 paths are internal and not exposed. You query through Foundry transforms, APIs, or the Ontology only.</td>
+  </tr>
+  <tr>
+    <td>Can I use my own S3 bucket instead?</td>
+    <td>Yes — Foundry supports <strong>external datasets</strong> that point to your S3 bucket. Trade-off: Foundry does not manage versioning, lineage, or schema enforcement for external datasets. You own all of that.</td>
+  </tr>
+  <tr>
+    <td>What file format does Foundry use?</td>
+    <td>Parquet (columnar), partitioned. Foundry manages partitioning automatically based on dataset size and write patterns. You do not configure this.</td>
+  </tr>
+  <tr>
+    <td>How do I get Bronze/Silver/Gold data into another tool (e.g., Databricks, dbt)?</td>
+    <td>Two options: (1) write a Foundry pipeline that exports to an external S3 dataset your other tool can read; (2) use Foundry's Data Connection to sync to an external system. Neither is seamless — this is a meaningful integration cost.</td>
+  </tr>
+  <tr>
+    <td>Is there vendor lock-in on storage?</td>
+    <td>Yes — the dataset paths, transaction log, and versioning are Foundry-proprietary. If the OEM migrates off Foundry, Bronze/Silver/Gold datasets don't port automatically. You would need to export everything to Parquet first, then rebuild lineage elsewhere. <strong>Delta Lake or Apache Iceberg on your own S3 bucket avoids this</strong> — same Parquet format, open transaction log, any engine can read it — but you lose Foundry's built-in lineage, versioning, and pipeline CI/CD.</td>
+  </tr>
+  <tr>
+    <td>How does this compare to Databricks / Delta Lake?</td>
+    <td>Delta Lake stores Parquet + an open-source transaction log (<code>_delta_log/</code>) in <em>your</em> S3 bucket. Any tool that understands Delta format can read it directly. Foundry's storage is equivalent in capability but proprietary in format — higher operational integration, higher lock-in.</td>
+  </tr>
+</table>
+
+<div class="section-intro" style="border-left-color:#e63946;background:#fff5f5;">
+  <strong>Lock-in decision for the OEM:</strong> Using Foundry-managed storage (default) gives you full lineage, versioning, CI/CD, and Expectations enforcement with zero infrastructure management. The cost is proprietary storage that doesn't port. If the OEM's architecture strategy requires data portability across platforms (e.g., Foundry + Databricks coexistence), the mitigation is to write Gold exports to an external Delta Lake dataset on the OEM's own S3 — Foundry can write there, Databricks can read from there, and the Gold layer becomes the clean handoff point between platforms.
+</div>
+
+<h3>Data Flow</h3>
+<div class="object-box">
+[Machine Sensors / ECM]
+       │
+       ▼
+[Kafka Topics] ──► Foundry Magritte Connector (streaming)
+[Legacy ETL]   ──► Foundry Dataset Ingestion (batch)
+       │
+       ▼
+BRONZE: /foundry/data/bronze/
+       │
+       ▼  Pipeline Builder transforms
+SILVER: /foundry/data/silver/
+       │
+       ▼  Aggregation + scoring + ontology mapping
+GOLD:   /foundry/data/gold/
+       │
+       ▼
+[Ontology Objects] ──► [Machine Domain APIs] ──► [Customer Portal]
+                                              ──► [NBO/NBA Engine]
+                                              ──► [Commerce Platform]</div>
+
+<!-- SECTION 2 — DATA REFINEMENT -->
+<div class="page-break"></div>
+<h1>2. Data Refinement, Ownership &amp; Enrichment</h1>
+<div class="section-intro">
+  Data moves through three layers in Foundry. Each layer has a distinct owner, toolset, and responsibility. Understanding who does what — and what contracts exist between teams — is critical to the architecture.
+</div>
+
+<h3>Team Ownership by Layer</h3>
+<table>
+  <tr><th>Layer</th><th>Owner</th><th>Foundry Tools</th><th>Responsibility</th></tr>
+  <tr><td><span class="layer-badge bronze">BRONZE</span></td><td>Data Engineering Team</td><td>Magritte connectors, batch ingestion pipelines</td><td>Land raw telemetry exactly as received — no changes, no cleanup</td></tr>
+  <tr><td><span class="layer-badge bronze">BRONZE</span> → <span class="layer-badge silver">SILVER</span></td><td>Data Engineering Team</td><td>Pipeline Builder, Code Workbook (PySpark)</td><td>Clean, validate, deduplicate, normalize units, enforce schema</td></tr>
+  <tr><td><span class="layer-badge silver">SILVER</span> → <span class="layer-badge gold">GOLD</span></td><td>Data Modeling / Architecture Team</td><td>Pipeline Builder, Code Workbook, Foundry AIP</td><td>Aggregate, score, join, enrich, write business-ready objects</td></tr>
+  <tr><td><span class="layer-badge gold">GOLD</span> → Ontology</td><td>Data Modeling / Architecture Team</td><td>Foundry Ontology Manager</td><td>Map Gold datasets to Object Types, define Link Types and properties</td></tr>
+</table>
+
+<h3>Bronze → Silver: What Data Engineering Does</h3>
+<div class="object-box">Raw Bronze data arrives (from Kafka stream or batch ETL)
+      │
+      ▼
+Pipeline Builder applies the following transforms:
+
+  1. NULL CHECKS
+     — Missing critical fields flagged (not dropped — preserved for audit)
+     — e.g. engine_hours = null → record flagged, written to /silver/flagged
+
+  2. RANGE VALIDATION
+     — Sensor readings outside physical limits rejected
+     — e.g. engine_temp_c = -9999 → invalid, flagged
+     — e.g. battery_voltage_v = 0 → invalid during operation, flagged
+
+  3. DEDUPLICATION
+     — Same sensor ping received twice (Kafka at-least-once delivery)
+     — Keep latest by timestamp, drop exact duplicates
+
+  4. UNIT NORMALIZATION
+     — All temperatures → Celsius
+     — All pressures → kPa
+     — All distances → kilometers
+     — All volumes → liters
+
+  5. TYPE ENFORCEMENT
+     — string "87.4" → float 87.4
+     — Unix epoch → ISO 8601 Timestamp
+
+  6. TIMESTAMP ALIGNMENT
+     — All timestamps converted to UTC
+     — Machine local time offset stored separately
+
+  7. SCHEMA ENFORCEMENT
+     — Records not matching expected schema → rejected to /silver/rejected
+     — Schema version tracked per machine model (EX-320 vs DZ-6 differ)
+      │
+      ▼
+Silver dataset: clean, validated, typed, deduplicated</div>
+
+<h3>Silver → Gold: What the Data Modeling Team Does</h3>
+<div class="object-box">Silver cleaned data
+      │
+      ▼
+Pipeline Builder + Code Workbook (PySpark) transforms:
+
+  1. AGGREGATION
+     — Roll up time-series into period summaries
+       e.g. 1000 engine_temp readings/day → daily avg, min, max, std_dev
+     — Cumulative totals
+       e.g. daily fuel_consumed → cumulative_fuel_consumed_ltrs
+
+  2. HEALTH SCORE CALCULATION (per domain)
+     — Weighted formula per component type
+       engine_health_score = (
+           oil_pressure_score  × 0.30
+         + coolant_temp_score  × 0.25
+         + engine_hours_score  × 0.25
+         + fault_code_score    × 0.20 )
+     — Overall machine health = weighted avg of all component scores
+
+  3. WEAR % CALCULATION
+     — Compare actual hours/cycles vs. OEM rated lifespan
+       e.g. track_shoe_wear_% = (engine_hours / oem_lifespan_hours) × 100
+     — Reset to 0 when WorkOrder confirms part replacement
+
+  4. ENRICHMENT JOINS (see enrichment section below)
+
+  5. ML MODEL OUTPUT MERGING
+     — Foundry AIP runs failure prediction models weekly
+     — Outputs written to /gold/ml_outputs
+     — Merged into Machine and Component objects:
+         predicted_failure_days, nbo_propensity_score, nba_urgency_score
+
+  6. ONTOLOGY OBJECT CREATION
+     — Gold datasets mapped to Machine, Component, Alert objects
+     — Link Types resolved (Machine HAS_COMPONENT, Machine TRIGGERS_ALERT)
+      │
+      ▼
+Gold dataset: scored, aggregated, enriched, ontology-ready</div>
+
+<h3>The 6 Enrichment Sources</h3>
+<table>
+  <tr><th>#</th><th>Enrichment Source</th><th>What It Adds</th><th>How Joined</th><th>Layer</th></tr>
+  <tr>
+    <td>1</td>
+    <td><b>OEM Machine Specs</b></td>
+    <td>Component lifespan thresholds, operating ranges, service intervals per machine model</td>
+    <td>JOIN on machine_model → oem_specs table<br>e.g. EX-320 hydraulic pump OEM life = 8,000 hrs</td>
+    <td><span class="layer-badge silver">SILVER</span> → <span class="layer-badge gold">GOLD</span></td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><b>Customer &amp; Dealer Master Data</b></td>
+    <td>Account tier, contract type, preferred dealer, NBO opt-out flag</td>
+    <td>JOIN on customer_id → customer_master table<br>Enables customer-specific NBO pricing and suppression</td>
+    <td><span class="layer-badge silver">SILVER</span> → <span class="layer-badge gold">GOLD</span></td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><b>Parts Catalog</b></td>
+    <td>OEM part number, Commerce Platform SKU, replacement urgency thresholds</td>
+    <td>JOIN on component_type + model_code → parts_catalog<br>Links worn component to purchasable part in Commerce Platform</td>
+    <td><span class="layer-badge gold">GOLD</span> layer</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td><b>Work Order History</b></td>
+    <td>Last service date, last replacement date, parts previously replaced</td>
+    <td>JOIN on machine_serial + component_id → workorder_history<br>Prevents NBO for recently replaced parts, resets wear % on completion</td>
+    <td><span class="layer-badge gold">GOLD</span> layer</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td><b>ML Model Outputs (Foundry AIP)</b></td>
+    <td>predicted_failure_days, NBO propensity score, NBA urgency score</td>
+    <td>JOIN on machine_serial_number → /gold/ml_outputs<br>Models retrained weekly on new telemetry + order/service outcomes</td>
+    <td><span class="layer-badge gold">GOLD</span> layer</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td><b>Commerce Platform (Live API)</b></td>
+    <td>Real-time inventory status, customer contract pricing</td>
+    <td>Live REST API call at NBO render time — NOT stored in Gold<br>Fetched on demand by Machine Domain API before serving NBO to portal</td>
+    <td>API layer (real-time)</td>
+  </tr>
+</table>
+
+<h3>How Each Enrichment Is Built &amp; Run</h3>
+<div class="section-intro">
+  Kafka handles the <b>arrival</b> of raw telemetry into Foundry. Enrichment happens <b>after</b> it lands — in scheduled Foundry pipelines. They are separate concerns.
+</div>
+
+<div class="object-box">Kafka                          Foundry
+─────────────────              ──────────────────────────────────
+Machine sensors                Magritte Connector
+  │ (real-time stream)    ──►  lands data into Bronze dataset
+  │                                    │
+  │                                    ▼
+  │                            Pipeline Builder: Bronze → Silver
+  │                            (every 15 minutes)
+  │                                    │
+  │                                    ▼
+  │                            Pipeline Builder: Silver → Gold
+  │                            (enrichment joins + scoring, hourly)
+  │                                    │
+  │                                    ▼
+  │                            Foundry AIP: ML model outputs merged
+  │                            (weekly retraining cycle)
+  │                                    │
+  │                                    ▼
+  └──────────────────────────  Machine Domain APIs serve
+                               updated data to portal / NBO / NBA</div>
+
+<h3>Enrichment Code Examples (Code Workbook — PySpark)</h3>
+
+<table>
+  <tr><th>Enrichment</th><th>How Built</th><th>Code Pattern</th></tr>
+  <tr>
+    <td><b>1. OEM Specs Join</b></td>
+    <td>Code Workbook (PySpark)<br>Scheduled — hourly</td>
+    <td>
+<div class="object-box" style="margin:0">silver_engine = foundry.datasets.load("/silver/engine_cleaned")
+oem_specs     = foundry.datasets.load("/reference/oem_machine_specs")
+
+gold_engine = silver_engine.join(
+    oem_specs, on="machine_model", how="left"
+).withColumn(
+    "wear_percentage",
+    (col("engine_hours") / col("oem_lifespan_hours")) * 100
+).withColumn(
+    "engine_health_score",
+    (col("oil_pressure_score") * 0.30 +
+     col("coolant_temp_score") * 0.25 +
+     col("engine_hours_score") * 0.25 +
+     col("fault_code_score")   * 0.20)
+)</div>
+    </td>
+  </tr>
+  <tr>
+    <td><b>2. Parts Catalog Join</b></td>
+    <td>Pipeline Builder (visual join node)<br>Scheduled — hourly</td>
+    <td>
+<div class="object-box" style="margin:0">Silver Component data
+  + /reference/parts_catalog
+  JOIN ON component_type + machine_model
+  → adds: oem_part_number
+           commerce_sku
+           avg_lifespan_hours
+           replacement_urgency</div>
+    </td>
+  </tr>
+  <tr>
+    <td><b>3. Work Order History Join</b></td>
+    <td>Code Workbook (PySpark)<br>Scheduled — hourly</td>
+    <td>
+<div class="object-box" style="margin:0">workorders = foundry.datasets.load("/gold/workorder_history")
+
+enriched = components.join(
+    workorders.filter(col("status") == "COMPLETED"),
+    on=["machine_serial_number", "component_type"],
+    how="left"
+).withColumn(
+    "days_since_replacement",
+    datediff(current_date(), col("completion_date"))
+).withColumn(
+    "nbo_suppressed",
+    col("days_since_replacement") < 30  # suppress NBO if &lt; 30 days
+)</div>
+    </td>
+  </tr>
+  <tr>
+    <td><b>4. ML Model Outputs</b></td>
+    <td>Foundry AIP writes scores to Gold<br>Weekly retraining, daily merge</td>
+    <td>
+<div class="object-box" style="margin:0">-- Foundry AIP model runs weekly:
+   Input:  /silver/* (all domains, rolling 90 days)
+   Output: /gold/ml_outputs
+     machine_serial_number
+     predicted_failure_days
+     nbo_propensity_score  (0-1 per part)
+     nba_urgency_score     (0-100)
+
+-- Gold pipeline merges daily:
+   JOIN machines
+     + /gold/ml_outputs
+     ON machine_serial_number
+   → predicted_failure_days added to Machine object</div>
+    </td>
+  </tr>
+  <tr>
+    <td><b>5. Commerce Platform Pricing</b></td>
+    <td>Live REST API — NOT a Foundry pipeline<br>Called at NBO render time</td>
+    <td>
+<div class="object-box" style="margin:0">-- Machine Domain API calls at serve time:
+GET /api/inventory?sku={commerce_sku}
+GET /api/pricing?sku={commerce_sku}&amp;customer_tier={tier}
+
+-- Response cached in Redis (TTL: 15 min)
+-- NOT stored in Foundry — always fresh at serve time
+-- Ensures real-time stock and pricing accuracy</div>
+    </td>
+  </tr>
+</table>
+
+<h3>Pipeline Scheduling</h3>
+<table>
+  <tr><th>Pipeline</th><th>Trigger</th><th>Frequency</th><th>Latency Impact</th></tr>
+  <tr><td>Kafka → Bronze (Magritte)</td><td>Continuous streaming</td><td>Real-time (~30 sec lag)</td><td>Telemetry available in Bronze within 30 sec of machine event</td></tr>
+  <tr><td>Bronze → Silver (cleaning)</td><td>Scheduled</td><td>Every 15 minutes</td><td>Clean data available within ~15 min of machine event</td></tr>
+  <tr><td>Silver → Gold (telemetry aggregation)</td><td>Scheduled</td><td>Every 15 minutes</td><td>Health scores refreshed every 15 min</td></tr>
+  <tr><td>Silver → Gold (health scoring)</td><td>Scheduled</td><td>Hourly</td><td>Full enrichment including joins refreshed hourly</td></tr>
+  <tr><td>Alert generation</td><td>Triggered (threshold breach)</td><td>Real-time from Silver</td><td>Critical alerts raised within minutes of event</td></tr>
+  <tr><td>ML model retraining</td><td>Scheduled</td><td>Weekly</td><td>Predictions improve weekly as new data accumulates</td></tr>
+  <tr><td>ML outputs → Gold</td><td>Triggered post-retraining</td><td>Weekly</td><td>Failure predictions updated weekly</td></tr>
+  <tr><td>Commerce Platform pricing</td><td>Live API call</td><td>At NBO render time</td><td>Always real-time — no lag, cached 15 min per SKU</td></tr>
+</table>
+
+<h3>Where Enrichment Runs — Inside Foundry, Not External Jobs</h3>
+<div class="section-intro">
+  All enrichment runs <b>inside Foundry</b> — there are no external Python jobs, custom servers, or Airflow DAGs. Foundry is a self-contained data platform with its own compute engine, scheduler, and code execution environment. The only exception is Commerce Platform pricing, which is a live REST API call made at serve time by the Machine Domain API.
+</div>
+
+<table>
+  <tr><th>Foundry Tool</th><th>What It Is</th><th>Where Code Lives</th><th>Used By</th></tr>
+  <tr><td><b>Pipeline Builder</b></td><td>Visual drag-and-drop transform editor — no code required</td><td>Foundry UI — visual nodes connected together</td><td>Both teams</td></tr>
+  <tr><td><b>Code Workbook</b></td><td>Jupyter-like notebook inside Foundry for exploratory transforms</td><td>Python / PySpark notebooks inside Foundry</td><td>Data modelers, analysts</td></tr>
+  <tr><td><b>Code Repository</b></td><td>Git-backed production transform code — the primary tool for all enrichment pipelines</td><td>Python / Java / Spark with @transform_df decorator, versioned in Foundry Git</td><td>Engineers for production pipelines</td></tr>
+  <tr><td><b>Foundry AIP</b></td><td>Built-in ML model training, scoring, and serving</td><td>Python notebooks + model registry inside Foundry</td><td>Data scientists</td></tr>
+  <tr><td><b>Magritte Connectors</b></td><td>Streaming ingestion from Kafka into Bronze</td><td>Configured in Foundry UI — no custom code</td><td>Data Engineering</td></tr>
+  <tr><td><b>Ontology Manager</b></td><td>Maps Gold datasets to Object Types and Link Types</td><td>Foundry UI — schema mapping, no code</td><td>Data Modeling team</td></tr>
+  <tr><td><b>Checks</b></td><td>Data quality rules that run after each pipeline</td><td>Defined in Foundry UI — alert if null rate spikes or output looks wrong</td><td>Both teams</td></tr>
+</table>
+
+<h3>How a Production Enrichment Transform Looks (Code Repository)</h3>
+<div class="object-box">-- Written inside Foundry Code Repository (Python)
+-- Foundry handles compute, scheduling, lineage — nothing external needed
+
+from transforms.api import transform_df, Input, Output
+from pyspark.sql.functions import col, datediff, current_date
+
+@transform_df(
+    output=Output("/gold/engine_health"),
+    silver=Input("/silver/engine_cleaned"),
+    oem=Input("/reference/oem_machine_specs"),
+    workorders=Input("/gold/workorder_history")
+)
+def compute_engine_health(silver, oem, workorders):
+
+    # Enrichment 1: Join OEM specs to calculate wear %
+    enriched = silver.join(oem, on="machine_model", how="left") \
+        .withColumn("wear_%",
+            col("engine_hours") / col("oem_lifespan_hours") * 100)
+
+    # Enrichment 2: Join work order history — suppress NBO if recently replaced
+    enriched = enriched.join(
+        workorders.filter(col("status") == "COMPLETED"),
+        on=["machine_serial_number", "component_type"], how="left"
+    ).withColumn("days_since_replacement",
+        datediff(current_date(), col("completion_date"))
+    ).withColumn("nbo_suppressed",
+        col("days_since_replacement") &lt; 30)
+
+    # Score calculation
+    return enriched.withColumn("engine_health_score",
+        col("oil_pressure_score")  * 0.30 +
+        col("coolant_temp_score")  * 0.25 +
+        col("engine_hours_score")  * 0.25 +
+        col("fault_code_score")    * 0.20)</div>
+
+<h3>What Foundry Handles Automatically (vs. External Python Jobs)</h3>
+<table>
+  <tr><th>Concern</th><th>Custom Python (external)</th><th>Foundry Code Repository</th></tr>
+  <tr><td>Compute</td><td>You manage servers / cloud infra</td><td>Foundry provisions Spark clusters automatically</td></tr>
+  <tr><td>Scheduling</td><td>You set up cron / Airflow DAGs</td><td>Foundry schedules automatically when upstream dataset changes</td></tr>
+  <tr><td>Data Lineage</td><td>Manual documentation</td><td>Foundry builds lineage graph automatically from @transform_df inputs/outputs</td></tr>
+  <tr><td>Versioning</td><td>You manage Git + deployment pipelines</td><td>Built into Foundry — every transform version tracked</td></tr>
+  <tr><td>Dependency management</td><td>You track which job feeds which manually</td><td>Foundry resolves the DAG — reruns downstream transforms automatically</td></tr>
+  <tr><td>Failure alerts</td><td>You build custom monitoring</td><td>Foundry alerts natively — email/Slack on pipeline failure</td></tr>
+  <tr><td>Dataset versioning</td><td>Manual snapshotting</td><td>Every dataset write is versioned — you can roll back to any prior state</td></tr>
+</table>
+
+<h3>Foundry Tools Used — Summary</h3>
+
+<h3>Schema Contract Between Teams</h3>
+<div class="section-intro">
+  The Data Modeling team defined the schema contracts that Data Engineering had to conform to when delivering Silver datasets. This meant: field names, data types, units, and null-handling rules were specified upfront. If the Silver output didn't match the contract, the Silver → Gold pipeline would reject it — preventing bad data from reaching the portal or NBO engine.
+</div>
+
+<!-- CODE REPOSITORY DEEP DIVE -->
+<div class="page-break"></div>
+<h1>3. Code Repository — Engineering Deep Dive</h1>
+<div class="section-intro">
+  Foundry Code Repository is the production-grade tool for all enrichment pipelines. It is a Git-backed environment where transforms are written in Python (or Java/Scala), version-controlled, built via Foundry CI, and executed on managed Spark compute. Pipeline Builder is used for simple joins and filters; Code Repository is used for everything complex.
+</div>
+
+<h2>Repository Structure</h2>
+<div class="object-box">my-telemetry-transforms/
+├── transforms-python/
+│   ├── src/
+│   │   └── mypackage/
+│   │       ├── __init__.py
+│   │       └── transforms/
+│   │           ├── bronze_to_silver/
+│   │           │   ├── engine_clean.py
+│   │           │   ├── dpf_clean.py
+│   │           │   └── hydraulics_clean.py
+│   │           ├── silver_to_gold/
+│   │           │   ├── engine_health.py
+│   │           │   ├── nbo_scoring.py
+│   │           │   └── urgency_score.py
+│   │           └── reference/
+│   │               └── mdm_sync.py
+│   ├── conda_recipe.yaml          ← Python dependencies
+│   └── build.gradle               ← Foundry build config
+└── README.md
+
+Each .py file = one transform function (one input dataset → one output dataset).
+Multiple transforms can share utility functions via __init__.py imports.</div>
+
+<h2>@transform_df vs @transform — When to Use Which</h2>
+<table>
+  <tr><th>Decorator</th><th>What It Returns</th><th>When to Use</th><th>Limitation</th></tr>
+  <tr><td><b>@transform_df</b></td><td>Returns a Spark DataFrame — Foundry writes the output dataset automatically</td><td>Majority of transforms. Clean, concise. Best for full-recompute pipelines.</td><td>Cannot do incremental processing — always reads full input dataset</td></tr>
+  <tr><td><b>@transform</b></td><td>Low-level — gives you <code>TransformInput</code> and <code>TransformOutput</code> objects, full control over read/write</td><td>Incremental processing (read only new partitions), custom write modes, file-level access, or when you need multiple output datasets</td><td>More verbose. Requires explicit <code>output.write_dataframe(df)</code> call.</td></tr>
+</table>
+
+<h3>@transform_df — Standard Full Recompute</h3>
+<div class="object-box">from transforms.api import transform_df, Input, Output
+from pyspark.sql import functions as F
+
+@transform_df(
+    output=Output("/silver/engine_telemetry_cleaned"),
+    raw=Input("/bronze/engine_telemetry_raw"),
+    mdm=Input("/reference/mdm_machine_registry"),
+)
+def clean_engine_telemetry(raw, mdm):
+    """Bronze → Silver: clean, validate, join MDM keys."""
+    return (
+        raw
+        # Step 1: Drop structural nulls (no serial = unusable row)
+        .filter(F.col("machine_id").isNotNull())
+        # Step 2: Deduplicate — take latest event per machine per minute
+        .withColumn("_rank", F.row_number().over(
+            Window.partitionBy("machine_id", F.window("event_ts", "1 minute"))
+                  .orderBy(F.col("event_ts").desc())
+        ))
+        .filter(F.col("_rank") == 1).drop("_rank")
+        # Step 3: Normalize units (raw values are mixed °F/°C, psi/kPa)
+        .withColumn("coolant_temp_c",
+            F.when(F.col("temp_unit") == "F",
+                (F.col("coolant_temp_raw") - 32) * 5 / 9
+            ).otherwise(F.col("coolant_temp_raw")))
+        .withColumn("oil_pressure_kpa",
+            F.when(F.col("pressure_unit") == "PSI",
+                F.col("oil_pressure_raw") * 6.895
+            ).otherwise(F.col("oil_pressure_raw")))
+        # Step 4: Join MDM to resolve canonical serial number
+        .join(mdm.select("machine_id", "serial_number", "machine_model"),
+              on="machine_id", how="left")
+        # Step 5: Quarantine rows with no MDM match (serial stays null → filtered downstream)
+        .withColumn("mdm_resolved", F.col("serial_number").isNotNull())
+    )</div>
+
+<h3>@transform — Incremental Processing (Engine/DPF Streaming Path)</h3>
+<div class="object-box">from transforms.api import transform, Input, Output, incremental
+
+@incremental()
+@transform(
+    output=Output("/silver/engine_streaming_cleaned"),
+    source=Input("/bronze/engine_telemetry_raw"),
+)
+def process_incremental(ctx, source, output):
+    """
+    Incremental mode: only process partitions added since last build.
+    Foundry tracks the high-water mark — no custom state management needed.
+    """
+    if ctx.is_incremental:
+        # Read only newly-added data (Foundry resolves the delta automatically)
+        new_data = source.dataframe(ctx, "added")
+    else:
+        # First build or full recompute — read everything
+        new_data = source.dataframe(ctx)
+
+    cleaned = new_data.filter(F.col("machine_id").isNotNull())
+    # ... transform logic ...
+    output.write_dataframe(cleaned)</div>
+
+<h2>Compute Profiles — Spark Sizing Inside Foundry</h2>
+<div class="section-intro">
+  Foundry manages Spark cluster provisioning. You select a compute profile via a decorator — you do not configure individual driver/executor settings. Profiles map to pre-defined cluster shapes.
+</div>
+<table>
+  <tr><th>Profile Name</th><th>Driver</th><th>Executors</th><th>When to Use</th></tr>
+  <tr><td><code>DRIVER_MEMORY_EXTRA_LARGE</code></td><td>64 GB RAM, 8 cores</td><td>Auto-scale</td><td>Large joins, broad aggregations (e.g., Silver → Gold across all 12 domains)</td></tr>
+  <tr><td><code>DRIVER_MEMORY_LARGE</code></td><td>32 GB RAM, 4 cores</td><td>Auto-scale</td><td>Default for most Bronze → Silver transforms</td></tr>
+  <tr><td><code>DRIVER_MEMORY_MEDIUM</code> (default)</td><td>16 GB RAM, 4 cores</td><td>Auto-scale</td><td>Simple filters, deduplication, reference dataset joins</td></tr>
+  <tr><td><code>SHUFFLE_OPTIMIZED</code></td><td>Medium driver</td><td>High executor count, more shuffle memory</td><td>Wide transforms with heavy groupBy/join shuffle — e.g., NBO urgency scoring across all machines</td></tr>
+  <tr><td><code>KUBERNETES_NO_CACHE</code></td><td>Standard</td><td>Standard</td><td>Force a clean build without Spark shuffle cache — use when debugging stale output</td></tr>
+</table>
+
+<div class="object-box">from transforms.api import transform_df, Input, Output, configure
+
+@configure(profile=["DRIVER_MEMORY_EXTRA_LARGE"])
+@transform_df(
+    output=Output("/gold/nbo_urgency_scores"),
+    engine=Input("/gold/engine_health"),
+    dpf=Input("/gold/dpf_health"),
+    hydraulics=Input("/gold/hydraulics_health"),
+    workorders=Input("/gold/workorder_history"),
+)
+def compute_urgency_scores(engine, dpf, hydraulics, workorders):
+    """Silver → Gold urgency scoring — large join across all domains."""
+    ...</div>
+
+<h2>Debugging & Build Logs</h2>
+<table>
+  <tr><th>Where to Look</th><th>What You Find</th><th>Common Use</th></tr>
+  <tr><td><b>Dataset → Builds tab</b></td><td>Full build history — status, duration, compute used, triggered by</td><td>First stop for any pipeline failure</td></tr>
+  <tr><td><b>Build → Spark logs</b></td><td>Driver stdout/stderr, executor logs, Python print/logging output</td><td>Debugging transform logic errors, null handling, join fanout issues</td></tr>
+  <tr><td><b>Dataset → Checks tab</b></td><td>Expectations results after each build — pass/fail per check, with row counts</td><td>Verify data quality gates passed before downstream runs</td></tr>
+  <tr><td><b>Dataset → Preview</b></td><td>First 100 rows of the dataset after build</td><td>Quick sanity check on output shape, unit normalization, null rates</td></tr>
+  <tr><td><b>Lineage graph</b></td><td>Full upstream/downstream dependency graph — which datasets feed this one, which depend on it</td><td>Understand blast radius of a schema change; trace a bad value to its source</td></tr>
+  <tr><td><b>Code Repository → CI tab</b></td><td>Build validation results per commit — did the transform compile? Did unit tests pass?</td><td>Pre-merge validation before pushing to production branch</td></tr>
+</table>
+
+<h2>CI/CD Build Cycle</h2>
+<div class="object-box">Developer pushes branch to Foundry Code Repository
+        │
+        ▼
+Foundry CI triggers automatically
+  ├── Linting (flake8 / pylint)
+  ├── Unit tests (pytest — runs against synthetic DataFrames, not real datasets)
+  └── Compilation check (@transform_df decorators resolve correctly)
+        │
+        ▼
+Developer opens Pull Request in Foundry UI
+  └── Reviewer approves → merge to main branch
+        │
+        ▼
+Foundry production build triggers on main
+  ├── Builds all changed transforms
+  ├── Runs Expectations (data quality checks) on output
+  └── If Expectations pass → downstream transforms cascade automatically
+        │
+        ▼
+Foundry Checks alert on failure
+  └── PagerDuty / Slack notification via Foundry webhook integration</div>
+
+<h2>Code Workbook → Code Repository — Promotion Path</h2>
+<div class="section-intro">
+  Code Workbook is the exploration environment (Jupyter-like). It is <b>not</b> for production pipelines — it lacks versioning, CI, and Expectations enforcement. The correct workflow is: explore in Workbook, promote to Code Repository for production.
+</div>
+<table>
+  <tr><th>Step</th><th>Action</th><th>Notes</th></tr>
+  <tr><td>1</td><td>Explore in Code Workbook against real Bronze/Silver data</td><td>Fast iteration — no CI overhead. Use for prototyping transform logic, checking distributions, testing join keys.</td></tr>
+  <tr><td>2</td><td>Export Workbook cells to Code Repository (Foundry "Export" button)</td><td>Foundry exports notebook cells as flat Python. The exported code needs cleanup — remove exploratory print statements, reshape into proper <code>@transform_df</code> function.</td></tr>
+  <tr><td>3</td><td>Refactor into production transform function</td><td>Add <code>@transform_df</code> decorator, define named Inputs/Outputs, add Expectations, remove hardcoded dataset paths (use Foundry Input/Output references).</td></tr>
+  <tr><td>4</td><td>Write unit tests against synthetic DataFrames</td><td>Create a <code>tests/</code> directory in the repo. Use <code>pyspark.sql.SparkSession</code> to create test DataFrames. Test edge cases: nulls, duplicates, out-of-range values.</td></tr>
+  <tr><td>5</td><td>Open PR in Foundry → CI runs → merge to main</td><td>CI validates compilation + tests. After merge, Foundry schedules the transform based on its trigger configuration.</td></tr>
+</table>
+
+<!-- PIPELINE BUILDER DEEP DIVE -->
+<div class="page-break"></div>
+<h1>4. Pipeline Builder — Visual Transform Tool</h1>
+<div class="section-intro">
+  Pipeline Builder is Foundry's visual, no-code transform editor. You connect nodes to build a data pipeline. Each node is a discrete operation (filter, join, aggregate, etc.). Output is a Foundry dataset. No Spark code required — Foundry compiles the visual graph to a Spark execution plan at runtime.
+</div>
+
+<h2>Node Type Reference</h2>
+<table>
+  <tr><th>Node</th><th>What It Does</th><th>SQL Equivalent</th><th>When to Use in This Platform</th></tr>
+  <tr><td><b>Source</b></td><td>Reads a Foundry dataset as input to the pipeline</td><td><code>FROM</code></td><td>Every pipeline starts with at least one Source node</td></tr>
+  <tr><td><b>Filter</b></td><td>Drops rows that don't match a condition (column comparisons, null checks, regex)</td><td><code>WHERE</code></td><td>Quarantine routing — e.g., route rows where <code>mdm_resolved = false</code> to the quarantine dataset</td></tr>
+  <tr><td><b>Select / Rename</b></td><td>Choose which columns to keep; rename columns</td><td><code>SELECT col AS alias</code></td><td>Trim wide Bronze datasets before joining — reduces shuffle cost</td></tr>
+  <tr><td><b>Compute</b></td><td>Adds new columns using expressions — arithmetic, string functions, conditionals</td><td><code>SELECT ..., expr AS new_col</code></td><td>Simple derived columns: <code>wear_pct = engine_hours / oem_lifespan_hours * 100</code></td></tr>
+  <tr><td><b>Join</b></td><td>Inner / left / right / cross join between two datasets on a key</td><td><code>JOIN ... ON</code></td><td>Enrichment joins — Silver + MDM reference, Silver + OEM specs. Left join when right-side miss is acceptable (not for MDM key resolution).</td></tr>
+  <tr><td><b>Aggregate</b></td><td>GROUP BY — sum, count, avg, min, max, first, last</td><td><code>GROUP BY ... HAVING</code></td><td>Daily rollup of engine hours per machine; fault code frequency per domain</td></tr>
+  <tr><td><b>Union</b></td><td>Stack two datasets with matching schemas</td><td><code>UNION ALL</code></td><td>Combining multiple telemetry domains into one unified health dataset (e.g., merge Engine + DPF alerts into a single alert stream)</td></tr>
+  <tr><td><b>Deduplicate</b></td><td>Remove duplicate rows, keeping first or last by a sort key</td><td><code>ROW_NUMBER() OVER ... = 1</code></td><td>Bronze deduplication — Kafka at-least-once delivery produces duplicate events; dedup by <code>(machine_id, event_ts)</code></td></tr>
+  <tr><td><b>Sort</b></td><td>ORDER BY one or more columns</td><td><code>ORDER BY</code></td><td>Rarely used alone — sort before a "first" aggregation, or for output ordering</td></tr>
+  <tr><td><b>Output</b></td><td>Writes the pipeline result to a named Foundry dataset</td><td><code>INSERT INTO</code></td><td>Every pipeline ends with an Output node — defines the dataset path (e.g., <code>/silver/engine_quarantine</code>)</td></tr>
+</table>
+
+<h2>Pipeline Builder vs Code Repository — Decision Guide</h2>
+<table>
+  <tr><th>Use Pipeline Builder when…</th><th>Use Code Repository when…</th></tr>
+  <tr><td>The transform is a join + filter + select — under 5 nodes</td><td>The transform has conditional logic, window functions, or multi-step enrichment</td></tr>
+  <tr><td>A non-engineer (data analyst, product owner) needs to own and modify the pipeline</td><td>The pipeline is production-critical and needs unit tests, CI, and Expectations</td></tr>
+  <tr><td>Rapid prototyping — faster to wire nodes than write boilerplate code</td><td>The pipeline is incremental — needs to process only new partitions</td></tr>
+  <tr><td>The output feeds a Contour dashboard (BI/analytics use case)</td><td>The output feeds the Ontology or NBO Engine — business-critical correctness required</td></tr>
+  <tr><td>Simple quarantine routing (filter → two output nodes)</td><td>ML scoring, urgency calculation, or complex multi-domain aggregations</td></tr>
+</table>
+
+<h2>Visual Pipeline — Bronze → Silver Quarantine Routing</h2>
+<div class="object-box">┌─────────────────────────────────────────────────────────────────────┐
+│  Pipeline Builder — Bronze → Silver (Engine Domain)                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+[Source: /bronze/engine_telemetry_raw]
+        │
+        ▼
+[Filter: machine_id IS NOT NULL]          ← drop structurally invalid rows
+        │
+        ▼
+[Deduplicate: on (machine_id, event_ts), keep latest]
+        │
+        ▼
+[Join (LEFT): + /reference/mdm_machine_registry  ON machine_id]
+        │
+        ├──[Filter: mdm_resolved = FALSE]──► [Output: /bronze/engine_quarantine]
+        │
+        └──[Filter: mdm_resolved = TRUE]
+                │
+                ▼
+        [Compute: coolant_temp_c = CASE WHEN temp_unit='F' THEN ...]
+                │
+                ▼
+        [Select: keep 22 canonical Silver fields, drop raw temp/pressure cols]
+                │
+                ▼
+        [Output: /silver/engine_telemetry_cleaned]</div>
+
+<h2>Scheduling & Trigger Modes</h2>
+<table>
+  <tr><th>Trigger Mode</th><th>How It Works</th><th>Used For</th></tr>
+  <tr><td><b>Dataset-triggered</b></td><td>Transform runs automatically when any upstream Input dataset is updated — Foundry monitors the upstream write event</td><td>Bronze → Silver transforms (trigger on Magritte Kafka ingestion completing); Silver → Gold (trigger on Silver build completing)</td></tr>
+  <tr><td><b>Schedule-triggered</b></td><td>Cron expression — runs at a fixed interval regardless of upstream state</td><td>MDM sync (runs daily at 4 AM regardless of upstream changes); NBO scoring (hourly batch)</td></tr>
+  <tr><td><b>Manual</b></td><td>Run on demand from the Foundry UI or via API</td><td>Backfill runs after fixing a bug; one-time data migration transforms</td></tr>
+  <tr><td><b>Cascading builds</b></td><td>When a transform completes successfully, Foundry automatically triggers all downstream transforms that depend on its output — the full DAG runs without manual intervention</td><td>End-to-end: Magritte ingestion → Bronze → Silver → Gold → Ontology population — all triggered by the first Kafka message arriving</td></tr>
+</table>
+
+<!-- SCHEMA CONTRACTS DEEP DIVE -->
+<div class="page-break"></div>
+<h1>5. Schema Contracts &amp; Data Quality Expectations</h1>
+<div class="section-intro">
+  Schema contracts are the formal agreements between teams on what a dataset must contain — field names, types, units, null rates, and value ranges. In this platform, the Data Modeling / Architecture team defines contracts for each Silver and Gold dataset. Data Engineering must produce Silver output that passes the contract before the Silver → Gold pipeline runs. Contracts are enforced via Foundry Expectations — code-level data quality checks that block downstream builds on failure.
+</div>
+
+<h2>What a Schema Contract Defines</h2>
+<table>
+  <tr><th>Contract Element</th><th>Example (Engine Silver)</th><th>Enforced By</th></tr>
+  <tr><td><b>Field names</b></td><td><code>machine_serial_number</code>, <code>event_ts</code>, <code>engine_hours</code>, <code>coolant_temp_c</code>, <code>oil_pressure_kpa</code></td><td>@transform_df output schema check at build time</td></tr>
+  <tr><td><b>Data types</b></td><td><code>serial_number: StringType</code>, <code>event_ts: TimestampType</code>, <code>engine_hours: DoubleType</code></td><td>Foundry schema validation on dataset write</td></tr>
+  <tr><td><b>Units (explicit)</b></td><td>Temperature in °C, pressure in kPa, hours as cumulative float — no mixed units permitted in Silver</td><td>Contract document + Expectation range checks</td></tr>
+  <tr><td><b>Null rates</b></td><td><code>serial_number</code>: 0% nulls (hard block); <code>engine_hours</code>: &lt; 1% nulls allowed; <code>fault_code</code>: nulls expected (no active fault = null)</td><td>Foundry Expectations (is_not_null, null_rate checks)</td></tr>
+  <tr><td><b>Value ranges</b></td><td>Engine hours: 0–50,000; Coolant temp: -40°C to 140°C; Oil pressure: 0–700 kPa</td><td>Foundry Expectations (between, greater_than checks)</td></tr>
+  <tr><td><b>Uniqueness</b></td><td>One row per <code>(serial_number, event_ts)</code> — no duplicates</td><td>Foundry Expectations (is_primary_key check)</td></tr>
+</table>
+
+<h2>Foundry Expectations — Code Implementation</h2>
+<div class="object-box">from transforms.api import transform_df, Input, Output
+from transforms.expectations import expectations, primary_key, column
+
+@expectations(
+    # Uniqueness: one row per machine per event timestamp
+    primary_key("serial_number", "event_ts"),
+
+    # Null rules: serial_number must never be null (hard block)
+    column("serial_number").is_not_null(),
+    column("event_ts").is_not_null(),
+
+    # Range checks: physical impossibility guards
+    column("engine_hours").between(0, 50_000),
+    column("coolant_temp_c").between(-40, 140),
+    column("oil_pressure_kpa").between(0, 700),
+
+    # Soft null check: less than 1% of rows may have null engine_hours
+    column("engine_hours").null_rate() < 0.01,
+
+    # Row count sanity: output must have at least 1,000 rows (catch empty-output bugs)
+    output.row_count() > 1_000,
+)
+@transform_df(
+    output=Output("/silver/engine_telemetry_cleaned"),
+    raw=Input("/bronze/engine_telemetry_raw"),
+    mdm=Input("/reference/mdm_machine_registry"),
+)
+def clean_engine_telemetry(raw, mdm):
+    ...</div>
+
+<h2>Expectation Failure Behaviour</h2>
+<table>
+  <tr><th>Failure Mode</th><th>What Foundry Does</th><th>Impact on Downstream</th></tr>
+  <tr><td><b>Hard block</b> (default)</td><td>Build fails, output dataset NOT written. Error surfaced in Checks tab.</td><td>All downstream transforms that depend on this dataset do NOT run — they stay on the previous good version.</td></tr>
+  <tr><td><b>Warn only</b> (configurable)</td><td>Build succeeds, output IS written. Warning visible in Checks tab.</td><td>Downstream runs normally but data quality warning is visible. Used for soft checks (null_rate slightly elevated) where the data is still usable.</td></tr>
+  <tr><td><b>Alert routing</b></td><td>Foundry fires a webhook on check failure → PagerDuty / Slack alert</td><td>On-call engineer receives P2 alert within 5 minutes of a Silver pipeline failing its Expectations (see Observability doc for routing rules).</td></tr>
+</table>
+
+<h2>Contract Versioning &amp; Breaking Changes</h2>
+<div class="section-intro">
+  Schema changes are treated as breaking if they remove a field, rename a field, change a type, or tighten a null constraint. Breaking changes require an Architecture Decision Record (ADR) and a migration plan before they can be merged.
+</div>
+<table>
+  <tr><th>Change Type</th><th>Breaking?</th><th>Process</th></tr>
+  <tr><td>Add a new nullable column</td><td>No</td><td>PR to Code Repo → CI → merge. Downstream transforms ignore unknown columns.</td></tr>
+  <tr><td>Rename a column</td><td>Yes</td><td>ADR required. Maintain old column name alongside new for one release cycle. Update all downstream transforms before removing old name.</td></tr>
+  <tr><td>Remove a column</td><td>Yes</td><td>ADR required. Confirm no downstream transform reads the column (check lineage graph). Two-step: deprecate (add warning), then remove.</td></tr>
+  <tr><td>Change a column type (e.g., String → Double)</td><td>Yes</td><td>ADR required. High-risk: Foundry Ontology object IDs must be stable — a type change on a primary key requires a full dataset reload and Ontology re-population.</td></tr>
+  <tr><td>Tighten a null constraint</td><td>Yes</td><td>Data Engineering must backfill historical data to meet the tighter constraint before the Expectation is deployed.</td></tr>
+  <tr><td>Change a value unit (e.g., °F → °C)</td><td>Yes</td><td>ADR required. All downstream consumers must be updated simultaneously — staged rollout not possible for unit changes.</td></tr>
+</table>
+
+<h2>Contract Governance — Who Owns What</h2>
+<table>
+  <tr><th>Team</th><th>Contract Responsibility</th></tr>
+  <tr><td><b>Data Modeling / Architecture</b></td><td>Authors the Silver and Gold schema contracts. Approves all breaking changes via ADR. Owns the Foundry Ontology schema.</td></tr>
+  <tr><td><b>Data Engineering</b></td><td>Implements Bronze → Silver transforms that must satisfy the Silver contract. Flags when source data makes a contract field impossible to meet (triggers a contract revision, not a silent violation).</td></tr>
+  <tr><td><b>NBO Engine / Portal team</b></td><td>Consumers of Gold datasets. Must not build against undocumented fields — only fields in the Gold contract are guaranteed stable. Reports contract violations to Data Modeling team, does not work around them.</td></tr>
+  <tr><td><b>Architecture team</b></td><td>Approves all ADRs for breaking schema changes. Owns the cross-team schema governance process.</td></tr>
+</table>
+
+<!-- SECTION 6 (formerly 3) -->
+<h1>6. Ontology Object Model</h1>
+<div class="section-intro">
+  Palantir Foundry Ontology organizes data as business objects rather than raw tables. Each object has properties mapped from Gold layer datasets and relationships to other objects.
+</div>
+
+<div class="object-box">OBJECT: Machine                          OBJECT: Component
+  serial_number (PK)                       component_id (PK)
+  model_code                               machine_serial_number (FK)
+  manufacture_year                         component_type
+  fleet_owner_id ──────────────────────►  health_score
+  dealer_id                                wear_percentage
+  warranty_status                          recommended_action
+  overall_health_score                     oem_part_number
+  health_status                            commerce_sku
+  predicted_failure_days                   estimated_hours_left
+
+OBJECT: Alert                            OBJECT: WorkOrder
+  alert_id (PK)                            workorder_id (PK)
+  machine_serial_number (FK)               machine_serial_number (FK)
+  fault_code                               service_type
+  severity (INFO/WARNING/CRITICAL)         parts_replaced []
+  triggered_timestamp                      technician_id
+  recommended_nba                          completion_date
+  assigned_workorder (FK)                  cost
+
+OBJECT: Customer                         OBJECT: Part
+  customer_id (PK)                         oem_part_number (PK)
+  account_tier                             part_name
+  dealer_id (FK)                           compatible_models []
+  machines [] (FK)                         avg_lifespan_hours
+  contract_type                            replacement_urgency
+  nbo_recommendations []                   commerce_sku
+                                           superseded_by</div>
+
+<!-- SECTION 3 -->
+<div class="page-break"></div>
+<h1>3. Domain: Engine</h1>
+<div class="section-intro">DPF = Diesel Particulate Filter | DEF = Diesel Exhaust Fluid | ECM = Electronic Control Module</div>
+
+<h3>Dataset Mapping</h3>
+<table>
+  <tr><th>Layer</th><th>Dataset</th><th>Key Fields</th></tr>
+  <tr><td><span class="layer-badge bronze">BRONZE</span></td><td>/bronze/engine_telemetry_raw</td><td>machine_id, timestamp, engine_rpm, engine_temp_raw, oil_pressure_raw, all raw sensor values</td></tr>
+  <tr><td><span class="layer-badge silver">SILVER</span></td><td>/silver/engine_telemetry_cleaned</td><td>Validated ranges, deduplicated, enriched with machine_model, units normalized (°C, kPa)</td></tr>
+  <tr><td><span class="layer-badge gold">GOLD</span></td><td>/gold/engine_health</td><td>engine_health_score, oil_life_remaining_%, hours_to_next_service, overdue_flag</td></tr>
+</table>
+
+<h3>Telemetry Signals & Parts Mapping</h3>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Replacement Part</th><th>Commerce SKU Field</th></tr>
+  <tr><td>Engine Hours</td><td>engine_hours</td><td>Per OEM schedule</td><td>Engine oil filter, air filter, fuel filter</td><td>commerce_sku_engine_service_kit</td></tr>
+  <tr><td>Oil Pressure</td><td>oil_pressure_kpa</td><td>Below min kPa</td><td>Engine oil, oil pump, oil filter</td><td>commerce_sku_oil_pump</td></tr>
+  <tr><td>Oil Temperature</td><td>oil_temp_c</td><td>Above max °C</td><td>Oil cooler, thermostat</td><td>commerce_sku_oil_cooler</td></tr>
+  <tr><td>Coolant Temperature</td><td>coolant_temp_c</td><td>Above max °C</td><td>Coolant hose, radiator, water pump, thermostat</td><td>commerce_sku_radiator</td></tr>
+  <tr><td>Turbo Boost Pressure</td><td>turbo_boost_pressure_kpa</td><td>Below spec</td><td>Turbocharger, intercooler, boost hose</td><td>commerce_sku_turbocharger</td></tr>
+  <tr><td>Engine Load Factor</td><td>engine_load_factor_%</td><td>Sustained &gt; 90%</td><td>Pistons, rings, bearings, head gasket</td><td>commerce_sku_engine_overhaul_kit</td></tr>
+  <tr><td>Blow-by Pressure</td><td>blowby_pressure_kpa</td><td>Above spec</td><td>Piston rings, cylinder liners, crankcase breather</td><td>commerce_sku_piston_ring_set</td></tr>
+  <tr><td>Fuel Injector</td><td>injector_return_rate</td><td>Return rate high</td><td>Fuel injectors, injector seals</td><td>commerce_sku_injector_set</td></tr>
+</table>
+
+<!-- SECTION 4 -->
+<h1>4. Domain: Fuel & Emissions (DPF / DEF)</h1>
+<div class="section-intro">
+  <b>DPF (Diesel Particulate Filter)</b> — Captures soot particles from diesel exhaust to meet emissions standards. Requires replacement or regeneration when soot load exceeds threshold.<br>
+  <b>DEF (Diesel Exhaust Fluid)</b> — Urea-based fluid (also called AdBlue) injected into exhaust stream to reduce NOx emissions. Must be refilled regularly.
+</div>
+
+<h3>Dataset Mapping</h3>
+<table>
+  <tr><th>Layer</th><th>Dataset</th><th>Key Fields</th></tr>
+  <tr><td><span class="layer-badge bronze">BRONZE</span></td><td>/bronze/emissions_telemetry_raw</td><td>dpf_soot_level_raw, def_level_raw, nox_reading_raw, fuel_consumption_raw</td></tr>
+  <tr><td><span class="layer-badge silver">SILVER</span></td><td>/silver/emissions_telemetry_cleaned</td><td>Validated % ranges, DEF quality flag, regeneration event history</td></tr>
+  <tr><td><span class="layer-badge gold">GOLD</span></td><td>/gold/emissions_health</td><td>dpf_replacement_urgency, def_refill_days_remaining, emissions_compliance_status</td></tr>
+</table>
+
+<h3>Telemetry Signals & Parts Mapping</h3>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Replacement Part</th><th>Commerce SKU Field</th></tr>
+  <tr><td>DPF Soot Level</td><td>dpf_soot_level_%</td><td>&gt; 80%</td><td>DPF filter element</td><td>commerce_sku_dpf_filter</td></tr>
+  <tr><td>DEF Level</td><td>def_level_%</td><td>&lt; 20%</td><td>DEF fluid refill, DEF injector, DEF pump</td><td>commerce_sku_def_fluid</td></tr>
+  <tr><td>NOx Reading</td><td>nox_sensor_ppm</td><td>Out of compliance</td><td>NOx sensor, SCR catalyst</td><td>commerce_sku_nox_sensor</td></tr>
+  <tr><td>Exhaust Back Pressure</td><td>exhaust_backpressure_kpa</td><td>Above spec</td><td>DPF, muffler, exhaust pipe</td><td>commerce_sku_exhaust_kit</td></tr>
+  <tr><td>Fuel Contamination</td><td>fuel_contamination_flag</td><td>Water/debris detected</td><td>Fuel filter, fuel water separator</td><td>commerce_sku_fuel_filter</td></tr>
+  <tr><td>DEF Quality</td><td>def_quality_flag</td><td>Contaminated</td><td>DEF tank flush kit, DEF filter</td><td>commerce_sku_def_filter</td></tr>
+</table>
+
+<!-- SECTION 5 -->
+<h1>5. Domain: Hydraulics</h1>
+<table>
+  <tr><th>Layer</th><th>Dataset</th><th>Key Fields</th></tr>
+  <tr><td><span class="layer-badge bronze">BRONZE</span></td><td>/bronze/hydraulics_telemetry_raw</td><td>hyd_pressure_raw, hyd_temp_raw, flow_rate_raw, cylinder_pressure_raw</td></tr>
+  <tr><td><span class="layer-badge silver">SILVER</span></td><td>/silver/hydraulics_cleaned</td><td>Validated, normalized units, enriched with component_id</td></tr>
+  <tr><td><span class="layer-badge gold">GOLD</span></td><td>/gold/hydraulics_health</td><td>pump_efficiency_%, hydraulic_health_score, filter_life_remaining_%</td></tr>
+</table>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Replacement Part</th><th>Commerce SKU Field</th></tr>
+  <tr><td>Hydraulic Pressure</td><td>hydraulic_pressure_kpa</td><td>Below spec</td><td>Hydraulic pump, relief valve, seals</td><td>commerce_sku_hyd_pump</td></tr>
+  <tr><td>Hydraulic Oil Temp</td><td>hydraulic_oil_temp_c</td><td>Above max °C</td><td>Hydraulic oil cooler, hydraulic oil</td><td>commerce_sku_hyd_cooler</td></tr>
+  <tr><td>Pump Efficiency</td><td>pump_efficiency_%</td><td>&lt; 85%</td><td>Hydraulic pump, pump drive coupling</td><td>commerce_sku_hyd_pump_kit</td></tr>
+  <tr><td>Return Filter Restriction</td><td>filter_differential_pressure</td><td>High differential</td><td>Hydraulic return filter</td><td>commerce_sku_hyd_return_filter</td></tr>
+  <tr><td>Cylinder Pressure</td><td>cylinder_pressure_kpa</td><td>Out of spec</td><td>Cylinder seals, piston rod, cylinder barrel</td><td>commerce_sku_cylinder_seal_kit</td></tr>
+  <tr><td>Hydraulic Oil Hours</td><td>hydraulic_oil_hours</td><td>Per OEM schedule</td><td>Hydraulic oil, hydraulic filter</td><td>commerce_sku_hyd_oil</td></tr>
+</table>
+
+<!-- SECTION 6 -->
+<h1>6. Domain: Transmission & Drivetrain</h1>
+<table>
+  <tr><th>Layer</th><th>Dataset</th><th>Key Fields</th></tr>
+  <tr><td><span class="layer-badge bronze">BRONZE</span></td><td>/bronze/transmission_telemetry_raw</td><td>trans_temp_raw, gear_selection_raw, torque_slip_raw, brake_pressure_raw</td></tr>
+  <tr><td><span class="layer-badge silver">SILVER</span></td><td>/silver/transmission_cleaned</td><td>Validated, gear mapping normalized, slip % calculated</td></tr>
+  <tr><td><span class="layer-badge gold">GOLD</span></td><td>/gold/transmission_health</td><td>transmission_health_score, clutch_wear_%, brake_life_remaining_%</td></tr>
+</table>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Replacement Part</th><th>Commerce SKU Field</th></tr>
+  <tr><td>Transmission Temp</td><td>transmission_temp_c</td><td>Above max °C</td><td>Transmission oil cooler, filter, oil</td><td>commerce_sku_trans_cooler</td></tr>
+  <tr><td>Torque Converter Slip</td><td>torque_converter_slip_%</td><td>Above spec %</td><td>Torque converter, clutch packs</td><td>commerce_sku_torque_converter</td></tr>
+  <tr><td>Brake Pressure</td><td>brake_pressure_kpa</td><td>Below spec</td><td>Brake pads, seals, brake pump</td><td>commerce_sku_brake_kit</td></tr>
+  <tr><td>Clutch Engagement</td><td>clutch_engagement_%</td><td>Above wear threshold</td><td>Clutch discs, plates, springs</td><td>commerce_sku_clutch_kit</td></tr>
+  <tr><td>Final Drive Oil Temp</td><td>final_drive_oil_temp_c</td><td>Above max °C</td><td>Final drive oil, seals, bearings</td><td>commerce_sku_final_drive_kit</td></tr>
+</table>
+
+<!-- SECTION 7 -->
+<h1>7. Domain: Undercarriage (Tracked Machines)</h1>
+<table>
+  <tr><th>Layer</th><th>Dataset</th><th>Key Fields</th></tr>
+  <tr><td><span class="layer-badge bronze">BRONZE</span></td><td>/bronze/undercarriage_telemetry_raw</td><td>track_tension_raw, sprocket_wear_raw, shoe_wear_raw, roller_wear_raw</td></tr>
+  <tr><td><span class="layer-badge silver">SILVER</span></td><td>/silver/undercarriage_cleaned</td><td>Wear % calculated vs OEM specs, left/right track differentiated</td></tr>
+  <tr><td><span class="layer-badge gold">GOLD</span></td><td>/gold/undercarriage_health</td><td>undercarriage_health_score, estimated_hours_remaining, replacement_urgency</td></tr>
+</table>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Replacement Part</th><th>Commerce SKU Field</th></tr>
+  <tr><td>Track Tension</td><td>track_tension_kpa</td><td>Out of spec</td><td>Track adjusters, recoil spring, grease</td><td>commerce_sku_track_adjuster</td></tr>
+  <tr><td>Sprocket Wear</td><td>sprocket_wear_%</td><td>&gt; 50% worn</td><td>Sprocket segments, drive sprocket</td><td>commerce_sku_sprocket_kit</td></tr>
+  <tr><td>Track Shoe Wear</td><td>track_shoe_wear_%</td><td>&gt; 60% worn</td><td>Track shoes, bolts, nuts</td><td>commerce_sku_track_shoe_set</td></tr>
+  <tr><td>Roller Wear</td><td>roller_wear_%</td><td>&gt; 50% worn</td><td>Carrier rollers, bottom rollers, seals</td><td>commerce_sku_roller_kit</td></tr>
+  <tr><td>Track Link Wear</td><td>track_link_elongation_mm</td><td>Elongation detected</td><td>Track chains, master links, pins, bushings</td><td>commerce_sku_track_chain</td></tr>
+  <tr><td>Idler Wear</td><td>idler_wear_%</td><td>&gt; 50% worn</td><td>Front idler, recoil assembly</td><td>commerce_sku_idler_kit</td></tr>
+</table>
+
+<!-- SECTION 8 -->
+<h1>8. Domain: Electrical System</h1>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Replacement Part</th><th>Commerce SKU Field</th></tr>
+  <tr><td>Battery Voltage</td><td>battery_voltage_v</td><td>&lt; 12.4V</td><td>Battery, cables, terminal connectors</td><td>commerce_sku_battery</td></tr>
+  <tr><td>Alternator Output</td><td>alternator_output_v</td><td>Below spec V</td><td>Alternator, belt, voltage regulator</td><td>commerce_sku_alternator</td></tr>
+  <tr><td>Starter Draw</td><td>starter_current_draw_a</td><td>Above spec amps</td><td>Starter motor, solenoid</td><td>commerce_sku_starter_kit</td></tr>
+  <tr><td>Sensor Fault Codes</td><td>active_sensor_faults []</td><td>Active faults</td><td>Individual sensors (temp, pressure, position)</td><td>commerce_sku_sensor_{type}</td></tr>
+  <tr><td>Wiring Faults</td><td>wiring_fault_flag</td><td>Shorts/opens detected</td><td>Wiring harness, connectors, fuses</td><td>commerce_sku_wiring_harness</td></tr>
+</table>
+
+<!-- SECTION 9 -->
+<h1>9. Domain: Productivity & Operator Behavior</h1>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Part / Action</th><th>Type</th></tr>
+  <tr><td>Load Cycles</td><td>load_cycles_count</td><td>Per OEM schedule</td><td>Bucket teeth, cutting edges, side cutters</td><td>NBO — Parts</td></tr>
+  <tr><td>Overload Events</td><td>overload_event_count</td><td>&gt; threshold</td><td>Structural inspection, boom pins, bushings</td><td>NBA — Service</td></tr>
+  <tr><td>Bucket Fill Factor</td><td>bucket_fill_factor_%</td><td>&lt; OEM target</td><td>Bucket teeth, cutting edges</td><td>NBO — Parts</td></tr>
+  <tr><td>Hammer Blow Count</td><td>hammer_blow_count</td><td>Per OEM schedule</td><td>Hammer tool, retainer pins, wear bushings</td><td>NBO — Parts</td></tr>
+  <tr><td>Idle Hours Ratio</td><td>idle_vs_working_ratio</td><td>&gt; 30% idle</td><td>No parts — operator coaching</td><td>NBA — Coaching</td></tr>
+  <tr><td>Operator ID</td><td>operator_id</td><td>Harsh operation pattern</td><td>No parts — training flag</td><td>NBA — Training</td></tr>
+</table>
+
+<!-- SECTION 10 -->
+<h1>10. Domain: Location & Geofencing</h1>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Part / Action</th><th>Type</th></tr>
+  <tr><td>GPS Signal Loss</td><td>gps_signal_strength_dbm</td><td>Repeated dropouts</td><td>Telematics antenna, GPS module</td><td>NBO — Parts</td></tr>
+  <tr><td>Geofence Violation</td><td>geofence_status</td><td>OUTSIDE / VIOLATION</td><td>No parts — fleet security alert</td><td>NBA — Alert</td></tr>
+  <tr><td>Telematics Modem</td><td>modem_signal_strength</td><td>Weak/lost signal</td><td>Telematics modem, SIM card, antenna cable</td><td>NBO — Parts</td></tr>
+  <tr><td>Last Transmission</td><td>last_transmission_ts</td><td>Silent &gt; 24 hrs</td><td>Connectivity check — NBA service visit</td><td>NBA — Service</td></tr>
+</table>
+
+<!-- SECTION 11 -->
+<h1>11. Domain: Structural & Safety</h1>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Part / Action</th><th>Type</th></tr>
+  <tr><td>Frame Stress Index</td><td>frame_stress_index</td><td>Above fatigue threshold</td><td>Frame crack inspection, structural welds</td><td>NBA — Critical Service</td></tr>
+  <tr><td>Tilt Angle</td><td>tilt_angle_degrees</td><td>Rollover threshold exceeded</td><td>ROPS inspection, cab mounts</td><td>NBA — Safety Alert</td></tr>
+  <tr><td>Boom/Arm Stress</td><td>boom_stress_index</td><td>Above spec</td><td>Boom pins, bushings, arm pins</td><td>NBO — Parts</td></tr>
+  <tr><td>Swing Speed</td><td>swing_speed_rpm</td><td>Out of spec</td><td>Swing motor, swing gear, swing bearing</td><td>NBO — Parts</td></tr>
+  <tr><td>Emergency Stop Count</td><td>emergency_stop_count</td><td>Increasing trend</td><td>Safety system inspection</td><td>NBA — Service</td></tr>
+</table>
+
+<!-- SECTION 12 -->
+<h1>12. Domain: Vibration & Acoustic</h1>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Replacement Part</th><th>Commerce SKU Field</th></tr>
+  <tr><td>Bearing Vibration</td><td>bearing_vibration_fft</td><td>Abnormal FFT signature</td><td>Wheel bearings, alternator bearings</td><td>commerce_sku_bearing_kit</td></tr>
+  <tr><td>Gear Mesh Frequency</td><td>gear_mesh_frequency_hz</td><td>Abnormal harmonics</td><td>Gear sets, transmission gears</td><td>commerce_sku_gear_set</td></tr>
+  <tr><td>Engine Knock</td><td>engine_knock_acoustic</td><td>Knock detected</td><td>Engine bearings, piston pins, rod bearings</td><td>commerce_sku_engine_bearing_kit</td></tr>
+  <tr><td>Pump Cavitation</td><td>pump_cavitation_flag</td><td>Acoustic signature detected</td><td>Hydraulic pump, suction strainer</td><td>commerce_sku_hyd_pump</td></tr>
+  <tr><td>Fan Imbalance</td><td>fan_vibration_index</td><td>Vibration spike</td><td>Cooling fan, fan hub, fan clutch</td><td>commerce_sku_fan_kit</td></tr>
+</table>
+
+<!-- SECTION 13 -->
+<h1>13. Domain: Fluid Analysis</h1>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Part / Action</th><th>Type</th></tr>
+  <tr><td>Oil Contamination</td><td>oil_metal_particle_ppm</td><td>Metal particles detected</td><td>Engine bearings, bushings — full inspection</td><td>NBA — Critical Service</td></tr>
+  <tr><td>Water in Fuel</td><td>fuel_water_content_%</td><td>Detected</td><td>Fuel water separator, fuel tank drain</td><td>NBO — Parts</td></tr>
+  <tr><td>Coolant Contamination</td><td>coolant_oil_presence</td><td>Oil in coolant detected</td><td>Head gasket, oil cooler</td><td>NBO — Parts</td></tr>
+  <tr><td>Hydraulic Viscosity</td><td>hydraulic_viscosity_index</td><td>Out of spec</td><td>Hydraulic oil, hydraulic filter</td><td>NBO — Parts</td></tr>
+</table>
+
+<!-- SECTION 14 -->
+<h1>14. Domain: OTA / ECM</h1>
+<div class="section-intro">ECM = Electronic Control Module — the machine's onboard computer that manages all systems and generates fault codes.</div>
+<table>
+  <tr><th>Signal</th><th>Property in Foundry</th><th>Trigger Condition</th><th>Part / Action</th><th>Type</th></tr>
+  <tr><td>ECM Firmware Version</td><td>ecm_firmware_version</td><td>Version mismatch</td><td>OTA update — NBA service visit</td><td>NBA — Service</td></tr>
+  <tr><td>Active Fault Codes</td><td>active_fault_codes []</td><td>Count above threshold</td><td>Varies by fault code → linked to Component</td><td>NBO/NBA</td></tr>
+  <tr><td>Sensor Calibration Drift</td><td>calibration_drift_flag</td><td>Out of tolerance</td><td>Individual sensors, calibration service</td><td>NBA — Service</td></tr>
+  <tr><td>ECM Voltage</td><td>ecm_voltage_v</td><td>Irregular</td><td>ECM power relay, fuse, ECM module</td><td>NBO — Parts</td></tr>
+</table>
+
+<!-- SECTION 15 -->
+<div class="page-break"></div>
+<h1>15. Machine Domain API Reference</h1>
+<div class="section-intro">Machine Domain APIs abstract Palantir Foundry from consuming applications. All calls are IAM-validated before data is returned.</div>
+
+<table>
+  <tr><th>Endpoint</th><th>Returns</th><th>Foundry Source</th><th>IAM Roles</th></tr>
+  <tr><td>GET /machines/{id}/health</td><td>overall_health_score, health_status, predicted_failure_days</td><td>/gold/machines_enriched</td><td>Customer, Dealer, OEM, Technician</td></tr>
+  <tr><td>GET /machines/{id}/telemetry</td><td>engine_hours, fuel_rate, gps, load_cycles</td><td>/gold/engine_health + location</td><td>Customer, Dealer, OEM</td></tr>
+  <tr><td>GET /machines/{id}/components</td><td>Component objects with wear % and recommended_action</td><td>/gold/component_health</td><td>All roles</td></tr>
+  <tr><td>GET /machines/{id}/alerts</td><td>Open Alert objects filtered by severity</td><td>/gold/alerts_active</td><td>IAM-scoped by machine ownership</td></tr>
+  <tr><td>GET /machines/{id}/emissions</td><td>dpf_soot_%, def_level_%, nox_status</td><td>/gold/emissions_health</td><td>Customer, Dealer, OEM</td></tr>
+  <tr><td>GET /machines/{id}/undercarriage</td><td>Track, sprocket, roller wear scores</td><td>/gold/undercarriage_health</td><td>Customer, Dealer, OEM</td></tr>
+  <tr><td>GET /customers/{id}/nbo</td><td>Ranked parts recommendations with Commerce SKUs</td><td>/gold/nbo_recommendations</td><td>Customer, Dealer</td></tr>
+  <tr><td>GET /customers/{id}/nba</td><td>Ranked service actions with urgency</td><td>/gold/nba_recommendations</td><td>Customer, Dealer, Technician</td></tr>
+  <tr><td>GET /fleets/{id}/summary</td><td>Aggregated health across all machines in fleet</td><td>/gold/fleet_summary</td><td>Dealer, OEM</td></tr>
+</table>
+
+<!-- FOOTER -->
+<br><br>
+<hr>
+<p style="text-align:center; color:#999; font-size:11px;">Palantir Foundry Machine Telemetry Domain Alignment &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+
+</body>
+</html>

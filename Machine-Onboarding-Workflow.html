@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Machine Onboarding Workflow — Machine Telemetry Platform</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 40px; color: #222; background: #fff; }
+  h1 { color: #1a1a2e; font-size: 22px; border-bottom: 3px solid #6d3fa0; padding-bottom: 8px; margin-top: 40px; }
+  h2 { color: #457b9d; font-size: 15px; margin: 6px 0 20px 0; }
+  h3 { color: #1a1a2e; font-size: 13px; margin: 18px 0 8px 0; font-weight: bold; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 60px 0 40px 0; }
+  .cover h1 { border: none; font-size: 28px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+  th { background: #1a1a2e; color: white; padding: 8px 12px; text-align: left; }
+  td { border: 1px solid #ddd; padding: 7px 12px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .note { background: #fffbe6; border-left: 4px solid #f4c542; padding: 10px 14px; margin: 16px 0; font-size: 12px; }
+  .step { display: flex; gap: 14px; margin: 10px 0; align-items: flex-start; }
+  .step-num { background: #6d3fa0; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; flex-shrink: 0; margin-top: 2px; }
+  .step-content { flex: 1; background: #f7f9fc; border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; }
+  .step-content strong { display: block; margin-bottom: 4px; color: #1a1a2e; }
+  .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: bold; color: white; }
+  .b-team { background: #457b9d; }
+  .b-auto { background: #2a9d8f; }
+  .b-manual { background: #f4a261; }
+  .lane { background: #f0f4f8; border-radius: 8px; padding: 16px 20px; margin: 12px 0; border-left: 5px solid #6d3fa0; }
+  .diagram-wrap { overflow-x: auto; margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Machine Onboarding Workflow</h1>
+  <p style="font-size:16px;color:#457b9d;">How a New Machine Model Gets Registered into the Telemetry Platform</p>
+  <p style="color:#999;font-size:11px;">Prepared by Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</div>
+
+<h1>1. Why Onboarding is an Architectural Problem</h1>
+<p>The current architecture assumes machines already exist in MDM and are already streaming telemetry. In reality, the OEM releases new machine models annually, dealers take delivery of new units, and customers add machines to their fleets constantly. Without a governed onboarding workflow, each new machine type becomes a manual engineering project — the platform doesn't scale.</p>
+
+<div class="note">
+  <strong>Two distinct onboarding scenarios:</strong><br>
+  <strong>A. New machine model</strong> (e.g., a next-generation large excavator) — new telemetry signals, potentially new CAN bus mappings, new schema registration required. Happens 2–4x per year. Engineering-led.<br>
+  <strong>B. New machine unit</strong> (existing model, new serial number) — machine physically exists, needs to appear in MDM and start streaming. Happens hundreds of times per year. Largely automated.
+</div>
+
+<!-- SCENARIO A: NEW MODEL -->
+<h1>2. Scenario A — New Machine Model Onboarding</h1>
+<h2>Engineering-led process. Estimated effort: 2–4 weeks per new model family.</h2>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <strong>Signal Discovery &amp; CAN Bus Mapping <span class="badge b-manual">Manual — OEM Engineering</span></strong>
+    OEM Engineering provides the J1939/CAN bus signal dictionary for the new model. Each signal maps to: parameter group number (PGN), signal name, unit, range, sample rate, and criticality. This document is the source of truth for schema design.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <strong>Schema Design &amp; Registration <span class="badge b-team">Data Modeling Team</span></strong>
+    Data Modeling team translates the CAN bus signal dictionary into an Avro/Protobuf schema. Schema registered in Confluent Schema Registry under the appropriate domain topic namespace (<code>telemetry.engine.v2</code>, etc.). Schema version bumped — backward compatibility validated (new fields must be optional/nullable). Schema contract published to Foundry Code Repository as a checked-in specification file.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <strong>MDM Registration <span class="badge b-manual">MDM Team (External)</span></strong>
+    New machine model added to MDM: model number, year, engine type, component list, warranty terms, OEM spec thresholds (wear limits, maintenance intervals). MDM is the external system — Data Engineering raises a ticket to MDM team. MDM sync runs the next day, populating <code>/bronze/mdm_machine</code> with the new model's spec data.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <strong>Magritte Connector Configuration <span class="badge b-team">Data Engineering</span></strong>
+    Magritte connector updated to consume the new Kafka topic (or new schema version on existing topic). Landing Bronze dataset path confirmed: <code>/bronze/{domain}_{model_family}_raw</code>. Connector deployed to Foundry dev environment first. Smoke test with 100 synthetic events.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-content">
+    <strong>Bronze→Silver Transform Update <span class="badge b-team">Data Engineering</span></strong>
+    Existing Silver transforms updated (or new transform added) to handle new signals. New fields added to Silver schema. Data Quality Checks updated: new null rate checks, range checks for new signals. Deployed to Foundry dev, validated against synthetic data, then promoted to staging via code review gate.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">6</div>
+  <div class="step-content">
+    <strong>Gold Layer &amp; Ontology Property Updates <span class="badge b-team">Data Modeling Team</span></strong>
+    If new signals introduce new health metrics or component properties, Gold aggregation logic updated. New Ontology properties added to Component or Machine object types (additive only — no breaking changes). Existing consumers unaffected by additive property additions (Foundry Ontology supports this by design).
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">7</div>
+  <div class="step-content">
+    <strong>NBO Parts Mapping <span class="badge b-team">Parts Catalog Team</span></strong>
+    New model's components mapped to Commerce Platform SKUs in the parts catalog Silver dataset. NBO suppression rules reviewed — any new components that need warranty suppression or order-history suppression configured. NBO Engine tested with synthetic urgency scenarios for new model.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">8</div>
+  <div class="step-content">
+    <strong>Telematics Unit Provisioning <span class="badge b-manual">OEM Manufacturing / Dealer</span></strong>
+    Telematics unit on the physical machine provisioned with X.509 device certificate (PKI workflow). Certificate bound to machine serial number from MDM. Kafka ACL created for the serial number. Machine is now authorized to stream telemetry.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">9</div>
+  <div class="step-content">
+    <strong>End-to-End Validation &amp; Sign-off <span class="badge b-team">Platform Engineering</span></strong>
+    10-machine pilot: stream live telemetry from 10 units of the new model. Validate Bronze landing, Silver cleanliness, Gold health scores, Ontology object creation, NBO recommendation generation, and Customer Portal display. Sign-off checklist completed by Platform Engineering, Data Engineering, and Product. Gate to production onboarding of full model fleet.
+  </div>
+</div>
+
+<!-- SCENARIO B: NEW UNIT -->
+<div class="page-break"></div>
+<h1>3. Scenario B — New Machine Unit Onboarding (Existing Model)</h1>
+<h2>Largely automated. Target: machine streaming to Foundry within 48 hours of dealer delivery.</h2>
+
+<div class="diagram-wrap">
+<svg width="860" height="320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="oa" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#555"/>
+    </marker>
+    <filter id="of"><feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.12"/></filter>
+  </defs>
+
+  <!-- Step boxes -->
+  <rect x="10" y="60" width="130" height="80" rx="8" fill="#1e6b60" filter="url(#of)"/>
+  <text x="75" y="88" fill="white" font-size="11" font-weight="bold" text-anchor="middle">MDM Entry</text>
+  <text x="75" y="104" fill="white" font-size="9" text-anchor="middle">New serial # added</text>
+  <text x="75" y="118" fill="white" font-size="9" text-anchor="middle">by sales/manufacturing</text>
+  <text x="75" y="134" fill="#a8f0e8" font-size="9" text-anchor="middle">T+0 (at manufacture)</text>
+
+  <line x1="140" y1="100" x2="165" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#oa)"/>
+
+  <rect x="165" y="60" width="130" height="80" rx="8" fill="#2a9d8f" filter="url(#of)"/>
+  <text x="230" y="88" fill="white" font-size="11" font-weight="bold" text-anchor="middle">MDM Sync</text>
+  <text x="230" y="104" fill="white" font-size="9" text-anchor="middle">Daily Magritte batch</text>
+  <text x="230" y="118" fill="white" font-size="9" text-anchor="middle">→ Bronze mdm_machine</text>
+  <text x="230" y="134" fill="white" font-size="9" text-anchor="middle">T+24hrs (max)</text>
+
+  <line x1="295" y1="100" x2="320" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#oa)"/>
+
+  <rect x="320" y="60" width="130" height="80" rx="8" fill="#457b9d" filter="url(#of)"/>
+  <text x="385" y="84" fill="white" font-size="11" font-weight="bold" text-anchor="middle">TU Certificate</text>
+  <text x="385" y="100" fill="white" font-size="11" font-weight="bold" text-anchor="middle">Provisioning</text>
+  <text x="385" y="116" fill="white" font-size="9" text-anchor="middle">X.509 cert issued</text>
+  <text x="385" y="130" fill="white" font-size="9" text-anchor="middle">Kafka ACL created</text>
+  <text x="385" y="144" fill="white" font-size="9" text-anchor="middle">T+2hrs after MDM sync</text>
+
+  <line x1="450" y1="100" x2="475" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#oa)"/>
+
+  <rect x="475" y="60" width="130" height="80" rx="8" fill="#6d3fa0" filter="url(#of)"/>
+  <text x="540" y="84" fill="white" font-size="11" font-weight="bold" text-anchor="middle">First Telemetry</text>
+  <text x="540" y="100" fill="white" font-size="11" font-weight="bold" text-anchor="middle">Event</text>
+  <text x="540" y="116" fill="white" font-size="9" text-anchor="middle">Machine starts streaming</text>
+  <text x="540" y="130" fill="white" font-size="9" text-anchor="middle">Serial # resolved ✓</text>
+  <text x="540" y="144" fill="white" font-size="9" text-anchor="middle">T+dealer delivery</text>
+
+  <line x1="605" y1="100" x2="630" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#oa)"/>
+
+  <rect x="630" y="60" width="130" height="80" rx="8" fill="#1a1a2e" filter="url(#of)"/>
+  <text x="695" y="84" fill="white" font-size="11" font-weight="bold" text-anchor="middle">Machine Object</text>
+  <text x="695" y="100" fill="white" font-size="11" font-weight="bold" text-anchor="middle">Created</text>
+  <text x="695" y="116" fill="white" font-size="9" text-anchor="middle">Ontology auto-creates</text>
+  <text x="695" y="130" fill="white" font-size="9" text-anchor="middle">Machine + Customer link</text>
+  <text x="695" y="144" fill="white" font-size="9" text-anchor="middle">T+48hrs (target)</text>
+
+  <!-- What-if: serial not in MDM -->
+  <rect x="320" y="180" width="320" height="70" rx="8" fill="#fff0f0" stroke="#e63946" stroke-width="1.5"/>
+  <text x="480" y="204" fill="#e63946" font-size="11" font-weight="bold" text-anchor="middle">⚠ If Serial Not in MDM</text>
+  <text x="480" y="220" fill="#555" font-size="10" text-anchor="middle">Telemetry event arrives → Bronze quarantine dataset</text>
+  <text x="480" y="236" fill="#555" font-size="10" text-anchor="middle">Daily quarantine report → MDM team to register serial</text>
+  <text x="480" y="252" fill="#555" font-size="10" text-anchor="middle">Quarantined events replayed after MDM resolves (no data loss)</text>
+
+  <!-- Arrow from TU box down to warning -->
+  <path d="M385,140 Q385,180 385,180" stroke="#e63946" stroke-width="1.2" fill="none" stroke-dasharray="4,3" marker-end="url(#oa)"/>
+
+  <!-- Timeline bar -->
+  <rect x="10" y="280" width="840" height="24" rx="4" fill="#f0f4f8"/>
+  <text x="75" y="296" fill="#555" font-size="10" text-anchor="middle">Day 0 (manufacture)</text>
+  <text x="230" y="296" fill="#555" font-size="10" text-anchor="middle">Day 1 (MDM sync)</text>
+  <text x="385" y="296" fill="#555" font-size="10" text-anchor="middle">Day 1 afternoon</text>
+  <text x="540" y="296" fill="#555" font-size="10" text-anchor="middle">Day of dealer delivery</text>
+  <text x="695" y="296" fill="#555" font-size="10" text-anchor="middle">≤ Day 2 (target)</text>
+</svg>
+</div>
+
+<!-- AUTOMATION -->
+<h1>4. Automated vs. Manual Steps Summary</h1>
+
+<table>
+  <tr><th>Step</th><th>Scenario A<br>(New Model)</th><th>Scenario B<br>(New Unit)</th><th>Automation Level</th></tr>
+  <tr><td>CAN bus signal mapping</td><td>Required</td><td>Not required</td><td><span class="badge b-manual">Manual</span> — OEM Engineering</td></tr>
+  <tr><td>Schema registration (Schema Registry)</td><td>Required</td><td>Not required</td><td><span class="badge b-manual">Manual</span> — Data Modeling team</td></tr>
+  <tr><td>MDM entry (new serial or new model)</td><td>Required</td><td>Required</td><td><span class="badge b-manual">Manual</span> — MDM team (external)</td></tr>
+  <tr><td>MDM → Bronze sync</td><td>Auto (daily Magritte)</td><td>Auto (daily Magritte)</td><td><span class="badge b-auto">Automated</span></td></tr>
+  <tr><td>Bronze dataset creation for new model</td><td>Foundry auto-creates on first write if dataset path pre-configured</td><td>Not applicable</td><td><span class="badge b-auto">Automated</span> (once connector configured)</td></tr>
+  <tr><td>X.509 certificate provisioning</td><td>Required</td><td>Required</td><td><span class="badge b-auto">Automated</span> — triggered by MDM sync event via Lambda workflow</td></tr>
+  <tr><td>Kafka ACL creation for serial number</td><td>Required</td><td>Required</td><td><span class="badge b-auto">Automated</span> — Lambda creates ACL on certificate issue</td></tr>
+  <tr><td>Ontology Machine object creation</td><td>Auto</td><td>Auto</td><td><span class="badge b-auto">Automated</span> — Foundry object sync from Gold dataset on first telemetry event</td></tr>
+  <tr><td>Silver/Gold transform updates</td><td>Required</td><td>Not required</td><td><span class="badge b-manual">Manual</span> — Data Engineering</td></tr>
+  <tr><td>NBO parts mapping for new model</td><td>Required</td><td>Not required</td><td><span class="badge b-manual">Manual</span> — Parts Catalog team</td></tr>
+  <tr><td>End-to-end validation</td><td>Required (10-machine pilot)</td><td>Automated checks on first 24hr of data</td><td>Scenario A: <span class="badge b-manual">Manual</span> sign-off &nbsp;|&nbsp; Scenario B: <span class="badge b-auto">Automated</span></td></tr>
+</table>
+
+<!-- SELF-SERVICE VISION (YEAR 3) -->
+<h1>5. Year 3 Vision — Self-Service Machine Onboarding Portal</h1>
+<h2>By Year 3, the onboarding workflow should be accessible to authorized users without engineering involvement for Scenario B.</h2>
+
+<div class="lane">
+  <h3>Self-Service Portal Capabilities (Year 3 Target)</h3>
+  <ul style="margin:8px 0 0 20px;line-height:1.8;font-size:12px;">
+    <li>Dealer submits new machine registration via Customer Portal (serial number, model, delivery date)</li>
+    <li>Portal validates against MDM API in real-time — confirms serial is known</li>
+    <li>Automated certificate provisioning triggered (no Data Engineering ticket)</li>
+    <li>Dealer receives confirmation: "Machine OEM-EX-2024-00142 is active and streaming. First health assessment available within 24 hours."</li>
+    <li>OEM Internal team gets new machine coverage dashboard update</li>
+    <li>If serial not in MDM: portal surfaces MDM registration form — dealer submits basic machine details, MDM team gets automated approval workflow</li>
+  </ul>
+</div>
+
+<div class="note">
+  <strong>This is the difference between a platform and a project.</strong> When onboarding a new machine requires a Jira ticket to Data Engineering, the platform doesn't scale. Self-service onboarding is the architectural goal — it means the platform is truly a product, not an internal consulting service.
+</div>
+
+<!-- KPIs -->
+<h1>6. Onboarding KPIs</h1>
+
+<table>
+  <tr><th>KPI</th><th>Year 1–2 Target</th><th>Year 3 Target</th></tr>
+  <tr><td>Time to stream: New unit (Scenario B) — MDM entry to first telemetry in Bronze</td><td>≤ 48 hours</td><td>≤ 24 hours (self-service)</td></tr>
+  <tr><td>Time to onboard: New model (Scenario A) — signal dictionary to production streaming</td><td>≤ 4 weeks</td><td>≤ 2 weeks (tooling improvements)</td></tr>
+  <tr><td>Quarantine rate — telemetry events from unregistered serials</td><td>≤ 2% of events</td><td>≤ 0.5% (MDM coverage improves)</td></tr>
+  <tr><td>Quarantine recovery time — serial registered to events replayed</td><td>≤ 48 hours</td><td>≤ 24 hours</td></tr>
+  <tr><td>Onboarding Data Engineering tickets per new unit</td><td>0 (fully automated)</td><td>0</td></tr>
+  <tr><td>Onboarding Data Engineering effort per new model</td><td>≤ 2 sprints (40 engineer-days)</td><td>≤ 1 sprint (20 engineer-days)</td></tr>
+</table>
+
+<br><br><hr>
+<p style="text-align:center;color:#999;font-size:11px;">Machine Onboarding Workflow — Machine Telemetry Platform &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</body>
+</html>

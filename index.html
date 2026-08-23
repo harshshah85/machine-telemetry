@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Machine Telemetry Platform — Architecture Reference</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+
+  /* HERO */
+  .hero { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); padding: 64px 40px 56px; text-align: center; border-bottom: 1px solid #21262d; }
+  .hero-tag { display: inline-block; background: #e63946; color: white; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; border-radius: 4px; padding: 4px 12px; margin-bottom: 20px; }
+  .hero h1 { font-size: 36px; font-weight: 700; color: #ffffff; line-height: 1.2; margin-bottom: 12px; }
+  .hero h1 span { color: #a8dadc; }
+  .hero p { font-size: 16px; color: #8b949e; max-width: 600px; margin: 0 auto 28px; line-height: 1.6; }
+  .hero-meta { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-size: 12px; color: #8b949e; }
+  .hero-meta span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #2a9d8f; display: inline-block; }
+
+  /* CARDS GRID */
+  .grid-section { max-width: 1100px; margin: 0 auto; padding: 48px 24px; }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #8b949e; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+
+  .card { background: #161b22; border: 1px solid #21262d; border-radius: 12px; padding: 28px; text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 12px; transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s; }
+  .card:hover { border-color: #457b9d; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .card-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .card-header { display: flex; align-items: flex-start; gap: 14px; }
+  .card-title { font-size: 16px; font-weight: 700; color: #e6edf3; line-height: 1.3; }
+  .card-subtitle { font-size: 12px; color: #8b949e; margin-top: 2px; }
+  .card-body { font-size: 13px; color: #8b949e; line-height: 1.6; }
+  .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .tag { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; padding: 3px 8px; border-radius: 20px; }
+
+  /* Card accent colors */
+  .card-l1l2 { border-top: 3px solid #e63946; }
+  .card-l1l2 .card-icon { background: rgba(230,57,70,0.15); }
+  .card-l1l2:hover { border-color: #e63946; }
+
+  .card-foundry { border-top: 3px solid #2a9d8f; }
+  .card-foundry .card-icon { background: rgba(42,157,143,0.15); }
+  .card-foundry:hover { border-color: #2a9d8f; }
+
+  .card-ontology { border-top: 3px solid #457b9d; }
+  .card-ontology .card-icon { background: rgba(69,123,157,0.15); }
+  .card-ontology:hover { border-color: #457b9d; }
+
+  .card-nbo { border-top: 3px solid #d4a017; }
+  .card-nbo .card-icon { background: rgba(212,160,23,0.15); }
+  .card-nbo:hover { border-color: #d4a017; }
+
+  .card-vs { border-top: 3px solid #6d3fa0; }
+  .card-vs .card-icon { background: rgba(109,63,160,0.15); }
+  .card-vs:hover { border-color: #6d3fa0; }
+
+  /* Tag colors */
+  .tag-arch { background: rgba(230,57,70,0.15); color: #e63946; }
+  .tag-foundry { background: rgba(42,157,143,0.15); color: #2a9d8f; }
+  .tag-data { background: rgba(212,160,23,0.15); color: #d4a017; }
+  .tag-ml { background: rgba(109,63,160,0.15); color: #b88ee8; }
+  .tag-api { background: rgba(69,123,157,0.15); color: #7ab8d8; }
+
+  /* ARCHITECTURE OVERVIEW */
+  .overview { background: #161b22; border: 1px solid #21262d; border-radius: 12px; padding: 32px; margin: 0 24px 40px; max-width: 1052px; margin-left: auto; margin-right: auto; }
+  .overview h2 { font-size: 16px; font-weight: 700; color: #e6edf3; margin-bottom: 20px; }
+  .flow { font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace; font-size: 12px; color: #8b949e; background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 20px 24px; overflow-x: auto; line-height: 1.9; }
+  .flow .hl { color: #2a9d8f; }
+  .flow .hl2 { color: #e63946; }
+  .flow .hl3 { color: #d4a017; }
+  .flow .hl4 { color: #a8dadc; }
+  .flow .comment { color: #484f58; }
+
+  /* KEY DECISIONS */
+  .decisions { max-width: 1100px; margin: 0 auto; padding: 0 24px 48px; }
+  .decisions h2 { font-size: 16px; font-weight: 700; color: #e6edf3; margin-bottom: 20px; }
+  .decision-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .decision-item { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 18px 20px; }
+  .decision-item h3 { font-size: 13px; font-weight: 700; color: #e6edf3; margin-bottom: 6px; }
+  .decision-item p { font-size: 12px; color: #8b949e; line-height: 1.6; }
+  .decision-num { font-size: 10px; font-weight: 700; color: #457b9d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+
+  /* FOOTER */
+  footer { border-top: 1px solid #21262d; text-align: center; padding: 28px 24px; font-size: 12px; color: #484f58; }
+  footer a { color: #457b9d; text-decoration: none; }
+  footer a:hover { color: #a8dadc; }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tag">Architecture Reference</div>
+  <h1>Machine Telemetry<br><span>Platform Design</span></h1>
+  <p>End-to-end architecture documentation for migrating legacy machine telemetry to Palantir Foundry — driving NBO/NBA recommendations through Customer Portal and Commerce Platform.</p>
+  <div class="hero-meta">
+    <span><span class="dot"></span> Palantir Foundry</span>
+    <span><span class="dot" style="background:#457b9d"></span> Kafka Streaming</span>
+    <span><span class="dot" style="background:#d4a017"></span> NBO/NBA Engine</span>
+    <span><span class="dot" style="background:#e63946"></span> Commerce Platform</span>
+    <span><span class="dot" style="background:#6d3fa0"></span> Machine Domain APIs</span>
+  </div>
+</div>
+
+<!-- DOCUMENT CARDS -->
+<div class="grid-section">
+  <div class="section-label">Reference Documents</div>
+  <div class="grid">
+
+    <!-- L1 & L2 Diagrams -->
+    <a href="Architecture-Diagrams-L1-L2.html" class="card card-l1l2">
+      <div class="card-header">
+        <div class="card-icon">📐</div>
+        <div>
+          <div class="card-title">L1 & L2 Architecture Diagrams</div>
+          <div class="card-subtitle">System Context + Container Diagrams</div>
+        </div>
+      </div>
+      <div class="card-body">
+        C4 model diagrams showing all external actors, swim-lane container breakdown, MDM integration pattern, phased Ontology build (Approaches 3 & 4), and 3-year platform roadmap.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-arch">C4 Model</span>
+        <span class="tag tag-foundry">MDM Integration</span>
+        <span class="tag tag-ml">Multi-Year Roadmap</span>
+        <span class="tag tag-api">Event-Sourced</span>
+      </div>
+    </a>
+
+    <!-- Foundry Telemetry Alignment -->
+    <a href="Palantir-Foundry-Telemetry-Alignment.html" class="card card-foundry">
+      <div class="card-header">
+        <div class="card-icon">⚙️</div>
+        <div>
+          <div class="card-title">Palantir Foundry Telemetry Alignment</div>
+          <div class="card-subtitle">Bronze → Silver → Gold Pipeline Design</div>
+        </div>
+      </div>
+      <div class="card-body">
+        All 12 telemetry domains mapped to Foundry dataset paths, enrichment strategy, pipeline scheduling, data quality transforms, team ownership, and PySpark code examples.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-foundry">12 Telemetry Domains</span>
+        <span class="tag tag-data">@transform_df</span>
+        <span class="tag tag-foundry">Magritte</span>
+        <span class="tag tag-data">Enrichment</span>
+      </div>
+    </a>
+
+    <!-- Ontology -->
+    <a href="Palantir-Ontology.html" class="card card-ontology">
+      <div class="card-header">
+        <div class="card-icon">🕸️</div>
+        <div>
+          <div class="card-title">Palantir Ontology Design</div>
+          <div class="card-subtitle">Object Graph, Links & Action Types</div>
+        </div>
+      </div>
+      <div class="card-body">
+        11 object types, 19 link types, 12 action types, property type registry, IAM access control matrix by role, and an SVG visual graph of the full Ontology.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-api">11 Object Types</span>
+        <span class="tag tag-api">19 Link Types</span>
+        <span class="tag tag-foundry">Action Types</span>
+        <span class="tag tag-arch">IAM</span>
+      </div>
+    </a>
+
+    <!-- NBO / NBA -->
+    <a href="NBO-NBA-Data-Model.html" class="card card-nbo">
+      <div class="card-header">
+        <div class="card-icon">🎯</div>
+        <div>
+          <div class="card-title">NBO / NBA Data Model</div>
+          <div class="card-subtitle">Next Best Offer & Next Best Action</div>
+        </div>
+      </div>
+      <div class="card-body">
+        Urgency scoring formula, suppression rules, ranking logic, NBO/NBA by telemetry domain, sample JSON payloads to Commerce Platform and Customer Portal, and closed-loop feedback design.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-data">Urgency Scoring</span>
+        <span class="tag tag-ml">ML Propensity</span>
+        <span class="tag tag-data">Commerce Platform</span>
+        <span class="tag tag-foundry">Closed Loop</span>
+      </div>
+    </a>
+
+    <!-- Security Architecture -->
+    <a href="Security-Architecture.html" class="card" style="border-top:3px solid #e63946;">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(230,57,70,0.15);">🔐</div>
+        <div>
+          <div class="card-title">Security Architecture</div>
+          <div class="card-subtitle">7-Layer Security Design — Edge to Application</div>
+        </div>
+      </div>
+      <div class="card-body">
+        Device X.509 certificates, Kafka SASL/SSL, Foundry IAM data markings, OAuth 2.0 flows by consumer type, WAF, STRIDE threat model, key management, and GDPR/CCPA compliance controls.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-arch">mTLS · OAuth 2.0</span>
+        <span class="tag tag-arch">STRIDE</span>
+        <span class="tag tag-foundry">IAM Markings</span>
+        <span class="tag tag-arch">GDPR</span>
+      </div>
+    </a>
+
+    <!-- Commerce Platform Integration -->
+    <a href="Commerce-Integration.html" class="card" style="border-top:3px solid #e76f51;">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(231,111,81,0.15);">🛒</div>
+        <div>
+          <div class="card-title">Commerce Platform Integration</div>
+          <div class="card-subtitle">Parts Store — NBO Deep Link & Order Closed Loop</div>
+        </div>
+      </div>
+      <div class="card-body">
+        NBO deep link construction, cart pre-population flow, live contract pricing API, order webhook closed loop, suppression rules at integration points, error handling, and NBO performance metrics.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-data">Deep Link</span>
+        <span class="tag tag-data">Contract Pricing</span>
+        <span class="tag tag-foundry">Order Webhook</span>
+        <span class="tag tag-ml">Conversion Metrics</span>
+      </div>
+    </a>
+
+    <!-- Observability -->
+    <a href="Observability-Monitoring.html" class="card" style="border-top:3px solid #2a9d8f;">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(42,157,143,0.15);">📊</div>
+        <div>
+          <div class="card-title">Observability & Monitoring</div>
+          <div class="card-subtitle">SLOs, Dashboards & Alert Routing</div>
+        </div>
+      </div>
+      <div class="card-body">
+        Pipeline freshness SLOs, API latency targets, NBO quality metrics, P1–P4 alert routing, dashboard design per team role, incident management process, and blameless post-mortem culture.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-api">SLOs · SLAs</span>
+        <span class="tag tag-foundry">Pipeline Health</span>
+        <span class="tag tag-data">NBO Quality</span>
+        <span class="tag tag-arch">Incident Mgmt</span>
+      </div>
+    </a>
+
+    <!-- FinOps -->
+    <a href="FinOps-Cost-Model.html" class="card" style="border-top:3px solid #d4a017;">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(212,160,23,0.15);">💰</div>
+        <div>
+          <div class="card-title">FinOps & Cost Architecture</div>
+          <div class="card-subtitle">Cost Model by Phase & ROI Framework</div>
+        </div>
+      </div>
+      <div class="card-body">
+        Foundry licensing components, AWS cost breakdown, phase-by-phase cost estimates (Year 1–3), 3-year ROI framework, 7 cost optimization levers, and cost governance model.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-data">TCO by Phase</span>
+        <span class="tag tag-ml">ROI Framework</span>
+        <span class="tag tag-data">Optimization Levers</span>
+      </div>
+    </a>
+
+    <!-- Machine Onboarding -->
+    <a href="Machine-Onboarding-Workflow.html" class="card" style="border-top:3px solid #6d3fa0;">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(109,63,160,0.15);">⚙️</div>
+        <div>
+          <div class="card-title">Machine Onboarding Workflow</div>
+          <div class="card-subtitle">New Model & New Unit Registration Process</div>
+        </div>
+      </div>
+      <div class="card-body">
+        Two onboarding scenarios (new model vs. new unit), step-by-step workflows, automated vs. manual step breakdown, quarantine recovery for unresolved MDM serial numbers, and Year 3 self-service vision.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-foundry">MDM Sync</span>
+        <span class="tag tag-api">Schema Registry</span>
+        <span class="tag tag-arch">X.509 Certs</span>
+        <span class="tag tag-ml">Self-Service</span>
+      </div>
+    </a>
+
+    <!-- Palantir vs Snowflake -->
+    <a href="Palantir-vs-Snowflake.html" class="card card-vs">
+      <div class="card-header">
+        <div class="card-icon">⚖️</div>
+        <div>
+          <div class="card-title">Palantir Foundry vs. Snowflake</div>
+          <div class="card-subtitle">Architecture Decision Reference</div>
+        </div>
+      </div>
+      <div class="card-body">
+        Feature-by-feature comparison across streaming, semantic layer, ML, governance, cost, and SQL performance. Decision matrix and hybrid architecture pattern.
+      </div>
+      <div class="card-tags">
+        <span class="tag tag-ml">Platform Comparison</span>
+        <span class="tag tag-arch">Decision Matrix</span>
+        <span class="tag tag-api">Hybrid Architecture</span>
+      </div>
+    </a>
+
+  </div>
+</div>
+
+<!-- ARCHITECTURE OVERVIEW -->
+<div class="overview">
+  <h2>Platform Architecture Overview</h2>
+  <div class="flow">
+<span class="comment">// Data Flow — Machine Telemetry Platform</span>
+
+<span class="hl">Machine Fleet</span>  ──(Kafka, real-time)──►  <span class="hl">Magritte Connector</span>  ──►  <span class="hl3">Bronze</span>  ──►  <span class="hl4">Silver</span>  ──►  <span class="hl3">Gold</span>  ──►  <span class="hl">Ontology</span>
+<span class="hl">MDM System</span>     ──(Magritte, daily)───►  <span class="hl3">Bronze Reference</span>  ──────────────────────────────────────────────────────►↑
+<span class="hl">Legacy Systems</span> ──(Batch ETL)─────────►  <span class="hl3">Bronze</span>  ─────────────────────────────────────────────────────────────►↑
+
+<span class="comment">// Year 3 Event-Sourced Path (Engine + DPF domains only)</span>
+<span class="hl">Magritte</span>  ──►  <span class="hl2">Foundry AIP Streaming</span>  ──►  <span class="hl">Ontology</span>  (direct write, ~30 sec)
+
+<span class="comment">// Serving & Applications</span>
+<span class="hl">Ontology</span>  ──►  <span class="hl4">Machine Domain APIs</span>  ──►  <span class="hl4">API Gateway</span>  ──►  <span class="hl2">Customer Portal</span>
+<span class="hl">Gold</span>  ──►  <span class="hl2">NBO/NBA Engine</span>  ──►  <span class="hl2">Customer Portal</span>  ──►  <span class="hl2">Commerce Platform</span>  (parts cart)
+<span class="hl2">Commerce Platform</span>  ──(order webhook)──►  <span class="hl">Foundry</span>  ──►  <span class="hl2">NBO Model Retraining</span>  (closed loop)
+  </div>
+</div>
+
+<!-- KEY DESIGN DECISIONS -->
+<div class="decisions">
+  <h2>Key Design Decisions</h2>
+  <div class="decision-grid">
+    <div class="decision-item">
+      <div class="decision-num">Decision 01</div>
+      <h3>MDM as External Golden Record</h3>
+      <p>MDM holds Machine / Customer / Dealer / Part master. Foundry consumes via daily Magritte sync. MDM keys are canonical Ontology IDs. Telemetry events with unresolved serial numbers are quarantined.</p>
+    </div>
+    <div class="decision-item">
+      <div class="decision-num">Decision 02</div>
+      <h3>Ontology-First Design, Incremental Population</h3>
+      <p>Full Ontology (11 objects) designed on paper in Year 1. Populated incrementally: Machine + Alert (Year 1), + Component/Part/WorkOrder (Year 2), all objects (Year 3). Consumers build against the contract from Day 1.</p>
+    </div>
+    <div class="decision-item">
+      <div class="decision-num">Decision 03</div>
+      <h3>Event-Sourced Path for Hot Domains</h3>
+      <p>Engine and DPF/DEF bypass the hourly Gold batch. Kafka → Foundry AIP Streaming → Ontology direct write at ~30 sec latency. Batch Gold retained for analytics and ML training.</p>
+    </div>
+    <div class="decision-item">
+      <div class="decision-num">Decision 04</div>
+      <h3>Machine Domain APIs as Abstraction Layer</h3>
+      <p>Consuming apps (Customer Portal, NBO/NBA Engine) never query the Foundry Ontology directly. Machine Domain APIs decouple app teams from Foundry internals and enable independent versioning.</p>
+    </div>
+    <div class="decision-item">
+      <div class="decision-num">Decision 05</div>
+      <h3>NBO Urgency Score Formula</h3>
+      <p>Score = (wear% × 0.35) + (fault_severity × 0.30) + (hours_remaining × 0.20) + (health_inverse × 0.10) + (historical_adj × 0.05). Levels: Critical ≥85, High 60–84, Medium 35–59, Routine &lt;35.</p>
+    </div>
+    <div class="decision-item">
+      <div class="decision-num">Decision 06</div>
+      <h3>ML Models Deferred to Year 3</h3>
+      <p>Failure prediction and NBO propensity models require 12–18 months of clean Gold history. Building ML on Year 1 data produces noisy recommendations and loses stakeholder trust. Rule-based NBO in Year 2 buys time.</p>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>Machine Telemetry Platform — Architecture Reference &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+  <p style="margin-top:6px;"><a href="https://harshshah85.github.io/about-me/">Portfolio ↗</a> &nbsp;·&nbsp; <a href="https://github.com/harshshah85/machine-telemetry">github.com/harshshah85/machine-telemetry</a></p>
+</footer>
+
+</body>
+</html>

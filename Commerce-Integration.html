@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Commerce Platform Integration — Parts Store</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 40px; color: #222; background: #fff; }
+  h1 { color: #1a1a2e; font-size: 22px; border-bottom: 3px solid #e76f51; padding-bottom: 8px; margin-top: 40px; }
+  h2 { color: #457b9d; font-size: 15px; margin: 6px 0 20px 0; }
+  h3 { color: #1a1a2e; font-size: 13px; margin: 18px 0 8px 0; font-weight: bold; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 60px 0 40px 0; }
+  .cover h1 { border: none; font-size: 28px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+  th { background: #1a1a2e; color: white; padding: 8px 12px; text-align: left; }
+  td { border: 1px solid #ddd; padding: 7px 12px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .note { background: #fffbe6; border-left: 4px solid #f4c542; padding: 10px 14px; margin: 16px 0; font-size: 12px; }
+  .flow-box { background: #1a1a2e; color: #a8dadc; font-family: 'Courier New', monospace; font-size: 12px; border-radius: 8px; padding: 18px 22px; margin: 16px 0; line-height: 2; }
+  .flow-box .hl { color: #e76f51; }
+  .flow-box .hl2 { color: #2a9d8f; }
+  .flow-box .hl3 { color: #d4a017; }
+  .flow-box .comment { color: #484f58; }
+  pre { background: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 14px 18px; font-size: 11px; overflow-x: auto; line-height: 1.6; }
+  .diagram-wrap { overflow-x: auto; margin: 20px 0; }
+  .step { background: #f7f9fc; border: 1px solid #ddd; border-radius: 8px; padding: 14px 18px; margin: 10px 0; display: flex; gap: 14px; }
+  .step-num { background: #e76f51; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; flex-shrink: 0; }
+  .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: bold; color: white; }
+  .b-ok { background: #2a9d8f; }
+  .b-err { background: #e63946; }
+  .b-warn { background: #f4a261; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Commerce Platform Integration</h1>
+  <p style="font-size:16px;color:#457b9d;">Parts Store — NBO Deep Link, Cart Pre-population & Order Closed Loop</p>
+  <p style="color:#999;font-size:11px;">Prepared by Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</div>
+
+<!-- OVERVIEW -->
+<h1>1. Integration Overview</h1>
+<h2>Three integration touchpoints between the Machine Telemetry Platform and Commerce Platform</h2>
+
+<div class="diagram-wrap">
+<svg width="900" height="340" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="aa" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#555"/>
+    </marker>
+    <marker id="aa-o" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#e76f51"/>
+    </marker>
+    <filter id="af"><feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.12"/></filter>
+  </defs>
+
+  <!-- Foundry NBO Engine -->
+  <rect x="20" y="110" width="180" height="120" rx="10" fill="#1a1a2e" filter="url(#af)"/>
+  <text x="110" y="140" fill="white" font-size="13" font-weight="bold" text-anchor="middle">NBO Engine</text>
+  <text x="110" y="158" fill="#a8dadc" font-size="10" text-anchor="middle">Palantir Foundry</text>
+  <text x="110" y="174" fill="#a8dadc" font-size="10" text-anchor="middle">Urgency scoring</text>
+  <text x="110" y="190" fill="#a8dadc" font-size="10" text-anchor="middle">Parts ranking</text>
+  <text x="110" y="208" fill="#a8dadc" font-size="10" text-anchor="middle">Deep-link generation</text>
+
+  <!-- Customer Portal -->
+  <rect x="280" y="110" width="180" height="120" rx="10" fill="#e63946" filter="url(#af)"/>
+  <text x="370" y="140" fill="white" font-size="13" font-weight="bold" text-anchor="middle">Customer Portal</text>
+  <text x="370" y="158" fill="white" font-size="10" text-anchor="middle">NBO widget</text>
+  <text x="370" y="174" fill="white" font-size="10" text-anchor="middle">Part cards with urgency</text>
+  <text x="370" y="190" fill="white" font-size="10" text-anchor="middle">Customer reviews &amp;</text>
+  <text x="370" y="206" fill="white" font-size="10" text-anchor="middle">clicks Add to Cart</text>
+
+  <!-- Commerce Platform -->
+  <rect x="560" y="60" width="300" height="220" rx="10" fill="#e76f51" filter="url(#af)"/>
+  <text x="710" y="90" fill="white" font-size="13" font-weight="bold" text-anchor="middle">Commerce Platform</text>
+  <text x="710" y="108" fill="white" font-size="10" text-anchor="middle">(Parts Store)</text>
+  <rect x="580" y="120" width="120" height="40" rx="6" fill="white" fill-opacity="0.2"/>
+  <text x="640" y="136" fill="white" font-size="10" font-weight="bold" text-anchor="middle">Parts Catalog</text>
+  <text x="640" y="150" fill="white" font-size="9" text-anchor="middle">SKU · Inventory · Price</text>
+  <rect x="720" y="120" width="120" height="40" rx="6" fill="white" fill-opacity="0.2"/>
+  <text x="780" y="136" fill="white" font-size="10" font-weight="bold" text-anchor="middle">Contract Pricing</text>
+  <text x="780" y="150" fill="white" font-size="9" text-anchor="middle">Per customer tier</text>
+  <rect x="580" y="174" width="120" height="40" rx="6" fill="white" fill-opacity="0.2"/>
+  <text x="640" y="190" fill="white" font-size="10" font-weight="bold" text-anchor="middle">Cart API</text>
+  <text x="640" y="204" fill="white" font-size="9" text-anchor="middle">Pre-populated checkout</text>
+  <rect x="720" y="174" width="120" height="40" rx="6" fill="white" fill-opacity="0.2"/>
+  <text x="780" y="190" fill="white" font-size="10" font-weight="bold" text-anchor="middle">Order Webhook</text>
+  <text x="780" y="204" fill="white" font-size="9" text-anchor="middle">POST on fulfillment</text>
+
+  <!-- Flow 1: NBO Engine → Portal -->
+  <line x1="200" y1="170" x2="280" y2="170" stroke="#555" stroke-width="1.8" marker-end="url(#aa)"/>
+  <text x="240" y="162" fill="#555" font-size="9" text-anchor="middle">NBO payload</text>
+  <text x="240" y="182" fill="#555" font-size="9" text-anchor="middle">+ deep link</text>
+
+  <!-- Flow 2: Portal → Commerce Platform (deep link click) -->
+  <line x1="460" y1="170" x2="560" y2="170" stroke="#e76f51" stroke-width="2" marker-end="url(#aa-o)"/>
+  <text x="510" y="160" fill="#e76f51" font-size="9" text-anchor="middle">Customer clicks</text>
+  <text x="510" y="174" fill="#e76f51" font-size="9" text-anchor="middle">"Add to Cart"</text>
+  <text x="510" y="188" fill="#e76f51" font-size="9" text-anchor="middle">→ deep link redirect</text>
+
+  <!-- Flow 3: Order webhook back -->
+  <path d="M710,280 Q710,310 370,260 Q200,250 110,240" stroke="#e76f51" stroke-width="1.5" fill="none" marker-end="url(#aa-o)" stroke-dasharray="5,3"/>
+  <text x="400" y="302" fill="#e76f51" font-size="9" text-anchor="middle">Order webhook → Foundry (closed loop)</text>
+
+  <!-- Pricing API call -->
+  <path d="M110,110 Q110,40 640,40 Q640,60 640,120" stroke="#d4a017" stroke-width="1.5" fill="none" marker-end="url(#aa)" stroke-dasharray="5,3"/>
+  <text x="380" y="32" fill="#d4a017" font-size="9" text-anchor="middle">NBO Engine calls Contract Pricing API at serve time (live pricing, not cached)</text>
+</svg>
+</div>
+
+<div class="note">
+  <strong>Key design decision:</strong> Commerce Platform contract pricing is called <em>live at serve time</em> by the NBO Engine — not cached in Foundry Gold. Part prices change frequently (contract tiers, promotions). Caching stale prices in recommendations would break customer trust. All other NBO data (urgency score, part compatibility, ranking) comes from Foundry Gold.
+</div>
+
+<!-- INTEGRATION POINT 1: NBO DEEP LINK -->
+<h1>2. Integration Point 1 — NBO Deep Link to Pre-populated Cart</h1>
+
+<h3>How the Deep Link Works</h3>
+<div class="step"><div class="step-num">1</div><div><strong>NBO Engine runs</strong> — reads Gold layer (urgency score, wear%, fault severity, component compatibility) and ranks recommended parts for each machine.</div></div>
+<div class="step"><div class="step-num">2</div><div><strong>Contract Pricing API called</strong> — NBO Engine calls Commerce Platform REST API (<code>GET /rest/V1/products/{sku}/tier-prices?customer_group_id={group_id}</code>) for each top-ranked part to retrieve live contract price for this customer's tier.</div></div>
+<div class="step"><div class="step-num">3</div><div><strong>Deep link constructed</strong> — NBO Engine builds a signed deep link URL that encodes the Commerce Platform cart payload. URL is signed with HMAC-SHA256 to prevent tampering.</div></div>
+<div class="step"><div class="step-num">4</div><div><strong>NBO payload delivered to Customer Portal</strong> — Portal renders NBO widget with part cards showing urgency badge, part name, compatibility, and contract price.</div></div>
+<div class="step"><div class="step-num">5</div><div><strong>Customer clicks Add to Cart</strong> — Browser follows deep link to Commerce Platform. Commerce validates HMAC, creates pre-populated cart with the specified SKU, quantity, and customer's contract price applied automatically.</div></div>
+<div class="step"><div class="step-num">6</div><div><strong>Customer completes checkout</strong> — Standard Commerce Platform checkout flow. Customer can modify quantity or remove items but cannot change the contract price applied.</div></div>
+
+<h3>Deep Link URL Structure</h3>
+<pre>https://parts.example.com/cart/add?
+  sku=OEM-1R-0750
+  &qty=1
+  &customer_group=FLEET_GOLD
+  &machine_serial=OEM-EX-2024-00142
+  &nbo_id=nbo_abc123
+  &urgency=HIGH
+  &source=member_portal
+  &expires=1747000000
+  &sig=HMAC-SHA256(secret, sku+qty+customer_group+machine_serial+nbo_id+expires)</pre>
+
+<div class="note">
+  <strong>Security:</strong> The <code>expires</code> timestamp limits link validity to 24 hours. The HMAC <code>sig</code> prevents parameter tampering (e.g., changing <code>customer_group</code> to get a better price tier). Commerce Platform validates sig before creating the cart session.
+</div>
+<div class="note">
+  <strong>Design note — customer_group format:</strong> The deep link uses the string alias (<code>customer_group=FLEET_GOLD</code>) for human readability and easier debugging; Commerce Platform resolves this to its internal numeric group ID at cart creation time. The pricing pre-fetch API call (Step 2) uses the numeric <code>customer_group_id=4</code> directly because the REST API requires it. Both refer to the same customer tier; the mapping is maintained in the Foundry Silver lookup table shown in the Pricing API section below.
+</div>
+
+<h3>NBO Payload to Customer Portal (JSON)</h3>
+<pre>{
+  "machine_serial": "OEM-EX-2024-00142",
+  "machine_model": "EX-390 Excavator",
+  "generated_at": "2026-05-10T14:30:00Z",
+  "recommendations": [
+    {
+      "rank": 1,
+      "component": "Engine Air Filter",
+      "domain": "ENGINE",
+      "urgency_level": "HIGH",
+      "urgency_score": 72.4,
+      "urgency_reason": "Filter efficiency at 34% — replacement due within 80 operating hours",
+      "oem_part_number": "1R-0750",
+      "commerce_sku": "OEM-1R-0750",
+      "description": "Engine Air Filter Element",
+      "contract_price": 48.50,
+      "list_price": 62.00,
+      "currency": "USD",
+      "availability": "IN_STOCK",
+      "estimated_delivery_days": 2,
+      "add_to_cart_url": "https://parts.example.com/cart/add?sku=OEM-1R-0750&qty=1&customer_group=FLEET_GOLD&machine_serial=OEM-EX-2024-00142&nbo_id=nbo_abc123&expires=1747086000&sig=abc123",
+      "suppression_flags": [],
+      "propensity_score": 0.84
+    },
+    {
+      "rank": 2,
+      "component": "DPF Filter",
+      "domain": "FUEL_EMISSIONS",
+      "urgency_level": "MEDIUM",
+      "urgency_score": 51.2,
+      "urgency_reason": "DPF soot load at 71% — approaching regeneration threshold",
+      "oem_part_number": "456-7890",
+      "commerce_sku": "OEM-456-7890",
+      "description": "Diesel Particulate Filter Assembly",
+      "contract_price": 2140.00,
+      "list_price": 2800.00,
+      "currency": "USD",
+      "availability": "ORDER_REQUIRED",
+      "estimated_delivery_days": 5,
+      "add_to_cart_url": "https://parts.example.com/cart/add?sku=OEM-456-7890&qty=1&...",
+      "suppression_flags": [],
+      "propensity_score": 0.61
+    }
+  ]
+}</pre>
+
+<!-- INTEGRATION POINT 2: CONTRACT PRICING API -->
+<div class="page-break"></div>
+<h1>3. Integration Point 2 — Commerce Platform Contract Pricing API</h1>
+
+<h3>API Call at Serve Time</h3>
+<table>
+  <tr><th>Detail</th><th>Value</th></tr>
+  <tr><td><strong>Endpoint</strong></td><td><code>GET /rest/V1/products/{sku}/tier-prices?customer_group_id={group_id}</code></td></tr>
+  <tr><td><strong>Auth</strong></td><td>OAuth 2.0 Client Credentials. NBO Engine holds client_id/client_secret in AWS Secrets Manager. Token TTL: 1 hour, cached by NBO Engine.</td></tr>
+  <tr><td><strong>Call timing</strong></td><td>Called per-part at NBO generation time. Results NOT cached in Foundry (live price only). Timeout: 2 seconds. Fallback: use list_price with disclaimer "contract price pending".</td></tr>
+  <tr><td><strong>Customer group mapping</strong></td><td>Customer tier from Foundry Ontology Customer object (<code>contract_tier</code> property, sourced from MDM) maps to Commerce Platform customer_group_id via a lookup table in Foundry Silver.</td></tr>
+  <tr><td><strong>Inventory check</strong></td><td>Separate call: <code>GET /rest/V1/stockItems/{sku}</code>. Returns qty and availability status. NBO Engine shows "IN_STOCK", "LOW_STOCK (&lt;5)", or "ORDER_REQUIRED" on the part card.</td></tr>
+  <tr><td><strong>Rate limit handling</strong></td><td>Commerce Platform API rate limit: 1000 req/min. NBO Engine batches pricing calls (up to 20 SKUs per machine recommendation set). Circuit breaker: if 3 consecutive timeouts, fall back to list price for 5 minutes.</td></tr>
+</table>
+
+<h3>Customer Group → Commerce Platform Group ID Mapping</h3>
+<table>
+  <tr><th>MDM Contract Tier</th><th>Commerce Platform Group ID</th><th>Discount Level</th></tr>
+  <tr><td>FLEET_PLATINUM</td><td>5</td><td>Up to 35% off list</td></tr>
+  <tr><td>FLEET_GOLD</td><td>4</td><td>Up to 25% off list</td></tr>
+  <tr><td>FLEET_SILVER</td><td>3</td><td>Up to 15% off list</td></tr>
+  <tr><td>FLEET_STANDARD</td><td>2</td><td>Up to 8% off list</td></tr>
+  <tr><td>RETAIL</td><td>1</td><td>List price</td></tr>
+</table>
+
+<!-- INTEGRATION POINT 3: ORDER WEBHOOK -->
+<h1>4. Integration Point 3 — Order Webhook (Closed Loop)</h1>
+<h2>Commerce Platform notifies Foundry on every order fulfillment — closing the feedback loop for NBO model retraining</h2>
+
+<h3>Webhook Flow</h3>
+<div class="step"><div class="step-num">1</div><div><strong>Order placed in Commerce Platform</strong> — Customer completes checkout. Commerce Platform creates order record.</div></div>
+<div class="step"><div class="step-num">2</div><div><strong>Webhook fired on order_complete event</strong> — Commerce Platform POSTs signed payload to Foundry webhook endpoint within 30 seconds of fulfillment status.</div></div>
+<div class="step"><div class="step-num">3</div><div><strong>Foundry validates HMAC signature</strong> — Webhook receiver Lambda validates <code>X-Commerce-Signature</code> header. Rejects if invalid or timestamp older than 5 minutes.</div></div>
+<div class="step"><div class="step-num">4</div><div><strong>Payload written to Bronze webhook dataset</strong> — Raw order event appended to <code>/bronze/commerce_orders</code>. Idempotency key: <code>order_id</code> — duplicate webhooks are deduplicated.</div></div>
+<div class="step"><div class="step-num">5</div><div><strong>Silver/Gold pipeline enriches order</strong> — Joins to NBO_Recommendation object via <code>nbo_id</code> to mark recommendation as ACTIONED. Updates Machine Ontology object with <code>last_parts_order_date</code>.</div></div>
+<div class="step"><div class="step-num">6</div><div><strong>NBO suppression updated</strong> — Ordered part triggers 30-day suppression rule in NBO Engine (don't recommend the same part again within 30 days of purchase).</div></div>
+<div class="step"><div class="step-num">7</div><div><strong>Model retraining signal</strong> — Weekly ML retraining job reads actioned vs. dismissed NBO recommendations to update propensity model weights.</div></div>
+
+<h3>Webhook Payload (Commerce Platform → Foundry)</h3>
+<pre>POST /webhooks/commerce/order
+X-Commerce-Signature: sha256=HMAC-SHA256(webhook_secret, payload_body)
+X-Commerce-Timestamp: 1747000000
+Content-Type: application/json
+
+{
+  "event_type": "order.complete",
+  "order_id": "ORD-2026-00842",
+  "order_placed_at": "2026-05-10T14:45:00Z",
+  "order_fulfilled_at": "2026-05-12T09:00:00Z",
+  "customer_id": "CUST-00291",
+  "customer_group": "FLEET_GOLD",
+  "machine_serial": "OEM-EX-2024-00142",
+  "nbo_id": "nbo_abc123",
+  "nbo_rank": 1,
+  "line_items": [
+    {
+      "sku": "OEM-1R-0750",
+      "oem_part_number": "1R-0750",
+      "description": "Engine Air Filter Element",
+      "qty_ordered": 1,
+      "unit_price": 48.50,
+      "contract_price": 48.50,
+      "currency": "USD"
+    }
+  ],
+  "order_total": 48.50,
+  "fulfillment_status": "SHIPPED",
+  "tracking_number": "1Z999AA10123456784"
+}</pre>
+
+<h3>What Foundry Does with the Order Event</h3>
+<table>
+  <tr><th>Action</th><th>Dataset / Object Updated</th><th>Business Purpose</th></tr>
+  <tr><td>Append raw order</td><td><code>/bronze/commerce_orders</code></td><td>Immutable event log. Source of truth for all order analytics.</td></tr>
+  <tr><td>Mark NBO as ACTIONED</td><td>NBO_Recommendation Ontology object — status: ACTIONED, actioned_at, order_id</td><td>Tracks recommendation conversion rate. NBO engine reads this to compute lift.</td></tr>
+  <tr><td>Update Machine object</td><td>Machine Ontology — last_parts_order_date, last_ordered_skus[]</td><td>Drives 30-day suppression rule for re-recommendation of same part.</td></tr>
+  <tr><td>Update Component wear reset</td><td>Component Ontology — if part is a wear item, reset wear_pct to 0 after installation confirmed (separate service confirmation step)</td><td>Prevents false CRITICAL urgency scores after part replacement.</td></tr>
+  <tr><td>Feed ML retraining</td><td>Gold training dataset: nbo_outcomes (nbo_id, actioned, dismissed, urgency_at_time, propensity_at_time)</td><td>Weekly model retraining uses this to improve propensity scoring accuracy.</td></tr>
+</table>
+
+<!-- SUPPRESSION & EDGE CASES -->
+<h1>5. NBO Suppression Rules at Commerce Platform Integration Points</h1>
+
+<table>
+  <tr><th>Rule</th><th>Trigger</th><th>Suppression Period</th><th>Source of Truth</th></tr>
+  <tr><td>Recent purchase suppression</td><td>Order webhook received for this SKU + machine_serial</td><td>30 days</td><td>Bronze commerce_orders dataset</td></tr>
+  <tr><td>Open work order suppression</td><td>WorkOrder object in Ontology has status=OPEN for this component</td><td>Until work order CLOSED</td><td>WorkOrder Ontology object</td></tr>
+  <tr><td>Warranty active suppression</td><td>Machine.warranty_expiry_date > today (from MDM)</td><td>Until warranty expires</td><td>MDM Machine Master → Foundry Bronze</td></tr>
+  <tr><td>Customer opt-out</td><td>Customer.nbo_opt_out = true in Ontology</td><td>Permanent until opt-in</td><td>Customer Ontology object (action: OPT_OUT_NBO)</td></tr>
+  <tr><td>No Commerce SKU mapping</td><td>OEM part number has no corresponding commerce_sku in parts catalog</td><td>Until SKU mapped in catalog</td><td>Parts catalog Silver dataset — missing sku join</td></tr>
+  <tr><td>Out of stock (ORDER_REQUIRED)</td><td>Commerce Platform inventory API returns qty=0</td><td>Show with lead-time warning, not suppressed — still shown with "5-day lead time" label</td><td>Commerce Platform stockItems API (live)</td></tr>
+</table>
+
+<!-- ERROR HANDLING -->
+<h1>6. Error Handling & Resilience</h1>
+
+<table>
+  <tr><th>Failure Scenario</th><th>Behavior</th><th>User Impact</th></tr>
+  <tr><td><span class="badge b-err">Commerce Platform API timeout</span> (pricing call &gt;2 sec)</td><td>Fallback to list_price with label "Estimated price — contract price applied at checkout". Circuit breaker opens after 3 failures.</td><td>Customer sees list price on card, actual contract price applied at checkout. No blocked experience.</td></tr>
+  <tr><td><span class="badge b-err">Commerce Platform API down</span></td><td>NBO recommendations shown without pricing. "Price available at checkout" label. Deep link still generated with SKU — Commerce Platform shows price at cart.</td><td>NBO widget still loads. Customer can still click through. Degraded pricing display only.</td></tr>
+  <tr><td><span class="badge b-err">Deep link HMAC validation fails</span> (at Commerce Platform)</td><td>Commerce Platform returns 403. Customer Portal shows "Link expired — please refresh" and calls NBO Engine to regenerate fresh deep link.</td><td>Customer sees one retry prompt. Second deep link generated within 2 seconds.</td></tr>
+  <tr><td><span class="badge b-err">Order webhook delivery fails</span> (Foundry endpoint down)</td><td>Commerce Platform retries webhook: immediately, then +1 min, +5 min, +30 min, +2 hrs. Dead letter after 5 failed attempts — ops alert triggered.</td><td>Order is fulfilled normally. Foundry feedback loop delayed by up to 2 hours. NBO suppression delayed.</td></tr>
+  <tr><td><span class="badge b-warn">Duplicate webhook</span> (same order_id received twice)</td><td>Foundry deduplicates on order_id before writing to Bronze. Second webhook silently dropped.</td><td>No impact. Idempotent design.</td></tr>
+  <tr><td><span class="badge b-warn">SKU not in Foundry parts catalog</span></td><td>NBO suppression rule fires — recommendation not generated for this component. Logged to data quality alert queue.</td><td>Customer does not see a recommendation for that part. Parts catalog team alerted to add mapping.</td></tr>
+</table>
+
+<!-- ANALYTICS -->
+<h1>7. Commerce Analytics — Measuring NBO Performance</h1>
+
+<table>
+  <tr><th>Metric</th><th>Formula</th><th>Target</th><th>Source</th></tr>
+  <tr><td><strong>NBO Conversion Rate</strong></td><td>Orders with nbo_id / Total NBO recommendations shown</td><td>&gt; 8% within 30 days of recommendation</td><td>Bronze commerce_orders JOIN Gold nbo_recommendations</td></tr>
+  <tr><td><strong>Recommendation Revenue Lift</strong></td><td>Revenue from NBO-sourced orders vs. organic parts orders (same customer cohort, same period)</td><td>&gt; 15% revenue lift</td><td>Foundry Contour dashboard — nbo_sourced flag on orders</td></tr>
+  <tr><td><strong>Urgency Score Accuracy</strong></td><td>% of CRITICAL/HIGH urgency recommendations that converted to order within 14 days</td><td>&gt; 40% for CRITICAL</td><td>NBO_Recommendation outcome join</td></tr>
+  <tr><td><strong>Suppression Effectiveness</strong></td><td>Rate of re-recommendations within 30 days of order (should be zero)</td><td>0%</td><td>Bronze orders dataset — detect suppression bypass bugs</td></tr>
+  <tr><td><strong>Pricing API Availability</strong></td><td>% of NBO generations with successful live price fetch</td><td>&gt; 99.5%</td><td>NBO Engine metric — logged to CloudWatch</td></tr>
+  <tr><td><strong>Deep Link Click-Through Rate</strong></td><td>Clicks on "Add to Cart" deep link / NBO widget impressions</td><td>&gt; 20%</td><td>Customer Portal analytics event (web analytics or custom)</td></tr>
+</table>
+
+<br><br><hr>
+<p style="text-align:center;color:#999;font-size:11px;">Commerce Platform Integration — Machine Telemetry Platform &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</body>
+</html>

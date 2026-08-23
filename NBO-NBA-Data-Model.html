@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NBO/NBA Engine — Data Model & Decision Framework</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 40px; color: #222; }
+  h1 { color: #1a1a2e; font-size: 22px; border-bottom: 3px solid #e63946; padding-bottom: 8px; }
+  h2 { color: #1a1a2e; font-size: 16px; margin-top: 32px; border-left: 4px solid #e63946; padding-left: 10px; }
+  h3 { color: #457b9d; font-size: 14px; margin-top: 16px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }
+  th { background-color: #1a1a2e; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #ddd; font-size: 12px; vertical-align: top; }
+  tr:nth-child(even) { background-color: #f8f9fa; }
+  .object-box { background: #f0f4f8; border: 1px solid #ccd6e0; border-radius: 6px; padding: 12px; margin: 10px 0; font-family: monospace; font-size: 12px; white-space: pre; }
+  .section-intro { background: #eaf4fb; border-left: 4px solid #457b9d; padding: 8px 12px; margin: 8px 0 16px 0; font-size: 12px; color: #333; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+  .nbo { background: #2a9d8f; color: white; }
+  .nba { background: #e76f51; color: white; }
+  .critical { background: #e63946; color: white; }
+  .warning { background: #f4a261; color: white; }
+  .routine { background: #2a9d8f; color: white; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 60px 0 40px 0; }
+  .cover h1 { border: none; font-size: 28px; }
+  .json-box { background: #1a1a2e; color: #a8dadc; border-radius: 6px; padding: 16px; margin: 10px 0; font-family: monospace; font-size: 11px; white-space: pre; overflow-x: auto; }
+  .toc { background: #f8f9fa; border: 1px solid #ddd; padding: 20px 30px; margin: 30px 0; }
+  .toc ol { margin: 0; padding-left: 20px; line-height: 2; }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>NBO / NBA Engine</h1>
+  <h2 style="border:none; font-size:20px; color:#457b9d;">Data Model & Decision Framework</h2>
+  <p>How telemetry signals determine Next Best Offer (parts) and Next Best Action (service)</p>
+  <p style="color:#999; font-size:11px;">Prepared by Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li>NBO vs NBA — Definition</li>
+    <li>Decision Framework Overview</li>
+    <li>Input Data Model (from Palantir Foundry)</li>
+    <li>Scoring & Urgency Model</li>
+    <li>NBO Decision Rules — Parts</li>
+    <li>NBA Decision Rules — Service Actions</li>
+    <li>NBO/NBA Output Data Model</li>
+    <li>Sample NBO Payload → Commerce Platform</li>
+    <li>Sample NBA Payload → Customer Portal</li>
+    <li>Closed Loop — Feedback into Foundry</li>
+    <li>IAM Restrictions on NBO/NBA</li>
+    <li>NBO/NBA Serving Architecture — Precompute, Cache &amp; Serve</li>
+  </ol>
+</div>
+
+<!-- SECTION 1 -->
+<h1>1. NBO vs NBA — Definition</h1>
+<table>
+  <tr><th>Term</th><th>Full Form</th><th>Purpose</th><th>Destination</th></tr>
+  <tr>
+    <td><span class="badge nbo">NBO</span></td>
+    <td>Next Best Offer</td>
+    <td>Recommend the right parts to purchase based on machine wear and telemetry signals</td>
+    <td>Commerce Platform — pre-populated cart, ranked parts list</td>
+  </tr>
+  <tr>
+    <td><span class="badge nba">NBA</span></td>
+    <td>Next Best Action</td>
+    <td>Recommend the right service action to take — inspect, schedule, dispatch, alert</td>
+    <td>Customer Portal — action cards, dealer scheduling, push notifications</td>
+  </tr>
+</table>
+
+<!-- SECTION 2 -->
+<h1>2. Decision Framework Overview</h1>
+<div class="object-box">
+[Palantir Foundry — Gold Layer]
+  Machine health scores
+  Component wear %
+  Active fault codes
+  Usage patterns
+  Historical replacement data
+  Customer purchase history
+          │
+          ▼
+[NBO/NBA Scoring Engine — Foundry AIP]
+  Step 1: Signal Collection     — gather all telemetry inputs per machine
+  Step 2: Urgency Scoring       — score each signal against thresholds
+  Step 3: Action Classification — NBO (parts) vs NBA (service) vs both
+  Step 4: Ranking               — prioritize by urgency + revenue impact
+  Step 5: Enrichment            — add part SKU, pricing, dealer availability
+  Step 6: Output                — write scored recommendations to Gold layer
+          │
+          ├──────────────────────────────────┐
+          ▼                                  ▼
+[NBO Recommendations]                [NBA Recommendations]
+  → Commerce Platform (parts cart)        → Customer Portal (action cards)
+  → Customer Portal (parts widget)       → Dealer CRM (service dispatch)
+  → Email/push notification            → Push notification (critical only)</div>
+
+<!-- SECTION 3 -->
+<h1>3. Input Data Model (from Palantir Foundry)</h1>
+<div class="section-intro">The NBO/NBA engine reads from the Gold layer. These are the inputs that drive every recommendation.</div>
+
+<h3>Machine Input Object</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Source Dataset</th><th>Used For</th></tr>
+  <tr><td>machine_serial_number</td><td>String</td><td>/gold/machines_enriched</td><td>Primary key — links all domains</td></tr>
+  <tr><td>model_code</td><td>String</td><td>/gold/machines_enriched</td><td>Filter compatible parts from catalog</td></tr>
+  <tr><td>engine_hours</td><td>Float</td><td>/gold/engine_health</td><td>Maintenance schedule triggers</td></tr>
+  <tr><td>overall_health_score</td><td>Float (0-100)</td><td>/gold/machines_enriched</td><td>Overall urgency weighting</td></tr>
+  <tr><td>active_fault_count</td><td>Integer</td><td>/gold/alerts_active</td><td>NBA urgency escalation</td></tr>
+  <tr><td>critical_fault_count</td><td>Integer</td><td>/gold/alerts_active</td><td>Immediate NBA trigger</td></tr>
+  <tr><td>predicted_failure_days</td><td>Integer</td><td>/gold/machines_enriched</td><td>NBO timing — how soon to offer</td></tr>
+  <tr><td>warranty_status</td><td>String</td><td>/gold/machines_enriched</td><td>Suppress NBO if under warranty</td></tr>
+  <tr><td>customer_id</td><td>String</td><td>/gold/machines_enriched</td><td>Link to purchase history + pricing</td></tr>
+</table>
+
+<h3>Component Input Object</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Source Dataset</th><th>Used For</th></tr>
+  <tr><td>component_id</td><td>String</td><td>/gold/component_health</td><td>Primary key</td></tr>
+  <tr><td>component_type</td><td>String</td><td>/gold/component_health</td><td>Match to parts catalog</td></tr>
+  <tr><td>health_score</td><td>Float (0-100)</td><td>/gold/component_health</td><td>NBO trigger scoring</td></tr>
+  <tr><td>wear_percentage</td><td>Float</td><td>/gold/component_health</td><td>Primary NBO trigger</td></tr>
+  <tr><td>estimated_hours_left</td><td>Integer</td><td>/gold/component_health</td><td>NBO timing urgency</td></tr>
+  <tr><td>recommended_action</td><td>String</td><td>/gold/component_health</td><td>MONITOR / SERVICE_SOON / REPLACE_NOW</td></tr>
+  <tr><td>oem_part_number</td><td>String</td><td>/gold/parts_catalog</td><td>Links to Commerce Platform SKU</td></tr>
+  <tr><td>last_replaced_date</td><td>Date</td><td>/gold/workorder_history</td><td>Avoid duplicate NBO for recently replaced</td></tr>
+</table>
+
+<h3>Customer Input Object</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Source Dataset</th><th>Used For</th></tr>
+  <tr><td>customer_id</td><td>String</td><td>/gold/customers</td><td>Primary key</td></tr>
+  <tr><td>account_tier</td><td>String</td><td>/gold/customers</td><td>Contract pricing in Commerce Platform</td></tr>
+  <tr><td>purchase_history []</td><td>Array</td><td>/gold/order_history</td><td>Collaborative filtering for NBO ranking</td></tr>
+  <tr><td>preferred_dealer_id</td><td>String</td><td>/gold/customers</td><td>NBA — route service to preferred dealer</td></tr>
+  <tr><td>nbo_opt_out_flag</td><td>Boolean</td><td>/gold/customers</td><td>Suppress NBO if customer opted out</td></tr>
+  <tr><td>open_workorders_count</td><td>Integer</td><td>/gold/workorder_history</td><td>Suppress NBA if already actioned</td></tr>
+</table>
+
+<!-- SECTION 4 -->
+<div class="page-break"></div>
+<h1>4. Scoring & Urgency Model</h1>
+<div class="section-intro">Every telemetry signal is scored against thresholds to produce an urgency level. Urgency drives both the NBO ranking and the NBA action type.</div>
+
+<h3>Urgency Score Calculation</h3>
+<table>
+  <tr><th>Urgency Level</th><th>Score Range</th><th>Trigger Condition</th><th>NBO Action</th><th>NBA Action</th></tr>
+  <tr>
+    <td><span class="badge critical">CRITICAL</span></td>
+    <td>85 — 100</td>
+    <td>Component failure imminent (&lt; 50 hrs), active critical fault, safety event</td>
+    <td>Immediate parts offer — top of portal, push notification</td>
+    <td>Immediate service dispatch — push alert to operator + dealer</td>
+  </tr>
+  <tr>
+    <td><span class="badge warning">HIGH</span></td>
+    <td>60 — 84</td>
+    <td>Wear &gt; 75%, estimated failure &lt; 200 hrs, active warning fault</td>
+    <td>Priority parts offer — prominent portal placement</td>
+    <td>Schedule service within 2 weeks</td>
+  </tr>
+  <tr>
+    <td><span class="badge" style="background:#457b9d;color:white;">MEDIUM</span></td>
+    <td>35 — 59</td>
+    <td>Wear 50-75%, approaching OEM service interval</td>
+    <td>Recommended parts — standard portal placement</td>
+    <td>Plan service next scheduled downtime</td>
+  </tr>
+  <tr>
+    <td><span class="badge routine">ROUTINE</span></td>
+    <td>0 — 34</td>
+    <td>Wear &lt; 50%, preventive maintenance upcoming</td>
+    <td>Suggested parts — email/newsletter</td>
+    <td>No immediate action — monitor</td>
+  </tr>
+</table>
+
+<h3>Urgency Score Formula</h3>
+<div class="object-box">urgency_score = (
+    (wear_percentage         × 0.35)   -- heaviest weight — direct wear signal
+  + (fault_severity_score   × 0.30)   -- critical=100, warning=60, info=20
+  + (hours_remaining_score  × 0.20)   -- inverse: fewer hours = higher score
+  + (health_score_inverse   × 0.10)   -- 100 - overall_health_score
+  + (historical_failure_adj × 0.05)   -- +bonus if this part failed before on same model
+)
+
+hours_remaining_score:
+  &lt; 50 hrs  → 100
+  50-200    → 75
+  200-500   → 40
+  &gt; 500 hrs  → 10
+
+fault_severity_score:
+  CRITICAL  → 100
+  WARNING   → 60
+  INFO      → 20
+  NONE      → 0</div>
+
+<!-- SECTION 5 -->
+<h1>5. NBO Decision Rules — Parts</h1>
+
+<h3>Suppression Rules (when NOT to generate NBO)</h3>
+<table>
+  <tr><th>Rule</th><th>Condition</th><th>Reason</th></tr>
+  <tr><td>Warranty suppression</td><td>warranty_status = ACTIVE</td><td>Parts covered — customer won't buy</td></tr>
+  <tr><td>Recent replacement</td><td>last_replaced_date &lt; 30 days ago</td><td>Just replaced — avoid duplicate offer</td></tr>
+  <tr><td>Open work order</td><td>open_workorders_count &gt; 0 for same component</td><td>Already being serviced</td></tr>
+  <tr><td>Customer opt-out</td><td>nbo_opt_out_flag = true</td><td>Customer preference</td></tr>
+  <tr><td>No SKU mapping</td><td>commerce_sku = null</td><td>Can't link to purchase — suppress until mapped</td></tr>
+</table>
+
+<h3>NBO Ranking Logic</h3>
+<table>
+  <tr><th>Rank Factor</th><th>Weight</th><th>Description</th></tr>
+  <tr><td>Urgency score</td><td>50%</td><td>Higher urgency = ranked higher</td></tr>
+  <tr><td>Revenue value</td><td>20%</td><td>Higher part value = ranked higher (business priority)</td></tr>
+  <tr><td>Purchase propensity</td><td>20%</td><td>ML model — did similar customers buy this?</td></tr>
+  <tr><td>Inventory availability</td><td>10%</td><td>In-stock parts ranked higher than back-order</td></tr>
+</table>
+
+<h3>NBO by Telemetry Domain</h3>
+<table>
+  <tr><th>Domain</th><th>Trigger Signal</th><th>Urgency Level</th><th>NBO Parts Offered</th></tr>
+  <tr><td>Engine</td><td>engine_hours at OEM interval</td><td><span class="badge routine">ROUTINE</span></td><td>Oil filter, air filter, fuel filter kit</td></tr>
+  <tr><td>Engine</td><td>oil_pressure below min</td><td><span class="badge critical">CRITICAL</span></td><td>Oil pump, oil filter, engine oil</td></tr>
+  <tr><td>Fuel/Emissions</td><td>dpf_soot_level &gt; 80%</td><td><span class="badge warning">HIGH</span></td><td>DPF filter element</td></tr>
+  <tr><td>Fuel/Emissions</td><td>def_level &lt; 20%</td><td><span class="badge warning">HIGH</span></td><td>DEF fluid (Diesel Exhaust Fluid) refill</td></tr>
+  <tr><td>Hydraulics</td><td>pump_efficiency &lt; 85%</td><td><span class="badge warning">HIGH</span></td><td>Hydraulic pump, drive coupling</td></tr>
+  <tr><td>Hydraulics</td><td>hydraulic_oil_hours at interval</td><td><span class="badge routine">ROUTINE</span></td><td>Hydraulic oil, return filter</td></tr>
+  <tr><td>Undercarriage</td><td>track_shoe_wear &gt; 60%</td><td><span class="badge warning">HIGH</span></td><td>Track shoes, bolts, nuts</td></tr>
+  <tr><td>Undercarriage</td><td>sprocket_wear &gt; 50%</td><td><span class="badge warning">HIGH</span></td><td>Sprocket segments, drive sprocket</td></tr>
+  <tr><td>Electrical</td><td>battery_voltage &lt; 12.4V</td><td><span class="badge" style="background:#457b9d;color:white;">MEDIUM</span></td><td>Battery, cables, terminal connectors</td></tr>
+  <tr><td>Vibration</td><td>bearing_vibration abnormal</td><td><span class="badge warning">HIGH</span></td><td>Bearing kit (wheel, alternator, idler)</td></tr>
+  <tr><td>Productivity</td><td>bucket_fill_factor low</td><td><span class="badge" style="background:#457b9d;color:white;">MEDIUM</span></td><td>Bucket teeth, cutting edges</td></tr>
+</table>
+
+<!-- SECTION 6 -->
+<div class="page-break"></div>
+<h1>6. NBA Decision Rules — Service Actions</h1>
+
+<h3>NBA Action Types</h3>
+<table>
+  <tr><th>Action Type</th><th>Trigger</th><th>Portal Display</th><th>Notification</th></tr>
+  <tr><td><span class="badge critical">IMMEDIATE DISPATCH</span></td><td>critical_fault_count &gt; 0 OR predicted_failure_days &lt; 7</td><td>Red alert card — top of dashboard</td><td>Push + SMS to operator + dealer</td></tr>
+  <tr><td><span class="badge warning">SCHEDULE SERVICE</span></td><td>urgency_score 60-84 OR predicted_failure_days 7-30</td><td>Orange action card — schedule CTA</td><td>Push notification to fleet manager</td></tr>
+  <tr><td><span class="badge" style="background:#457b9d;color:white;">PLAN MAINTENANCE</span></td><td>urgency_score 35-59 OR approaching OEM interval</td><td>Blue recommendation card</td><td>Email summary (weekly digest)</td></tr>
+  <tr><td><span class="badge routine">MONITOR</span></td><td>urgency_score &lt; 35</td><td>Green status — no action required</td><td>No notification</td></tr>
+  <tr><td><span class="badge" style="background:#6d6875;color:white;">OPERATOR COACHING</span></td><td>idle_ratio &gt; 30% OR harsh operation pattern</td><td>Coaching recommendation card</td><td>Email to fleet manager</td></tr>
+</table>
+
+<h3>NBA by Telemetry Domain</h3>
+<table>
+  <tr><th>Domain</th><th>Trigger Signal</th><th>Action Type</th><th>NBA Recommendation</th></tr>
+  <tr><td>Engine</td><td>coolant_temp above max</td><td><span class="badge critical">IMMEDIATE</span></td><td>Stop machine — inspect cooling system immediately</td></tr>
+  <tr><td>Fuel/Emissions</td><td>nox out of compliance</td><td><span class="badge critical">IMMEDIATE</span></td><td>Schedule emissions repair — regulatory risk</td></tr>
+  <tr><td>Hydraulics</td><td>cylinder pressure out of spec</td><td><span class="badge warning">SCHEDULE</span></td><td>Schedule hydraulic cylinder inspection within 2 weeks</td></tr>
+  <tr><td>Structural</td><td>frame_stress above fatigue threshold</td><td><span class="badge critical">IMMEDIATE</span></td><td>Remove from service — structural inspection required</td></tr>
+  <tr><td>Safety</td><td>tilt_angle exceeds rollover threshold</td><td><span class="badge critical">IMMEDIATE</span></td><td>Operator alert — ROPS inspection required</td></tr>
+  <tr><td>Transmission</td><td>torque_converter_slip high</td><td><span class="badge warning">SCHEDULE</span></td><td>Schedule transmission service within 2 weeks</td></tr>
+  <tr><td>Fluid Analysis</td><td>oil_metal_particles detected</td><td><span class="badge critical">IMMEDIATE</span></td><td>Stop machine — internal wear investigation required</td></tr>
+  <tr><td>Location</td><td>geofence_violation</td><td><span class="badge critical">IMMEDIATE</span></td><td>Fleet security alert — unauthorized machine movement</td></tr>
+  <tr><td>OTA/ECM</td><td>ecm_firmware outdated</td><td><span class="badge" style="background:#457b9d;color:white;">PLAN</span></td><td>Schedule OTA update at next service visit</td></tr>
+  <tr><td>Productivity</td><td>idle_ratio &gt; 30%</td><td><span class="badge" style="background:#6d6875;color:white;">COACHING</span></td><td>Operator idling above benchmark — review with fleet manager</td></tr>
+</table>
+
+<!-- SECTION 7 -->
+<h1>7. NBO/NBA Output Data Model</h1>
+<div class="section-intro">The output objects are written back to Foundry Gold layer and served via Machine Domain APIs to the Customer Portal and Commerce Platform.</div>
+
+<div class="object-box">OBJECT: NBO_Recommendation
+  nbo_id                  String      Unique recommendation ID
+  machine_serial_number   String      FK to Machine
+  customer_id             String      FK to Customer
+  generated_timestamp     Timestamp   When scored
+  expiry_timestamp        Timestamp   Recommendation valid until
+  rank                    Integer     1 = highest priority
+  urgency_level           String      CRITICAL / HIGH / MEDIUM / ROUTINE
+  urgency_score           Float       0-100
+  trigger_domain          String      ENGINE / HYDRAULICS / UNDERCARRIAGE etc.
+  trigger_signal          String      e.g. "dpf_soot_level_% = 83"
+  reason_text             String      Human-readable: "DPF filter at 83% — replace within 120 hrs"
+  component_id            String      FK to Component
+  oem_part_number         String      OEM part number
+  part_name               String      "Diesel Particulate Filter Element"
+  commerce_sku      String      Direct link to Commerce Platform product
+  quantity_recommended    Integer     OEM-recommended replacement quantity
+  contract_price          Float       Customer-tier pricing from Commerce Platform
+  estimated_failure_date  Date        ML model predicted failure date
+  status                  String      ACTIVE / ORDERED / DISMISSED / EXPIRED
+
+OBJECT: NBA_Recommendation
+  nba_id                  String      Unique recommendation ID
+  machine_serial_number   String      FK to Machine
+  customer_id             String      FK to Customer
+  generated_timestamp     Timestamp
+  rank                    Integer
+  action_type             String      IMMEDIATE / SCHEDULE / PLAN / MONITOR / COACHING
+  urgency_score           Float       0-100
+  trigger_domain          String
+  trigger_signal          String      e.g. "frame_stress_index = 94"
+  action_text             String      "Remove from service — structural inspection required"
+  recommended_dealer_id   String      Nearest/preferred dealer
+  estimated_service_hours Float       How long the service will take
+  estimated_service_cost  Float       Dealer estimate
+  booking_url             String      Deep link to dealer scheduling system
+  notification_sent_flag  Boolean     Push/SMS already sent?
+  status                  String      ACTIVE / SCHEDULED / COMPLETED / DISMISSED</div>
+
+<!-- SECTION 8 -->
+<div class="page-break"></div>
+<h1>8. Sample NBO Payload → Commerce Platform</h1>
+<div class="json-box">{
+  "machine_serial": "OEM-320-XJ4421",
+  "customer_id": "CUST-8842",
+  "customer_tier": "GOLD",
+  "generated_at": "2026-05-10T09:14:00Z",
+  "recommendations": [
+    {
+      "rank": 1,
+      "urgency_level": "CRITICAL",
+      "urgency_score": 91.4,
+      "trigger_domain": "FUEL_EMISSIONS",
+      "trigger_signal": "dpf_soot_level_% = 87",
+      "reason": "DPF (Diesel Particulate Filter) at 87% soot load — replace within 80 hrs",
+      "oem_part_number": "OEM-4P-0711",
+      "part_name": "Diesel Particulate Filter Element",
+      "commerce_sku": "EMIS-DPF-001",
+      "quantity": 1,
+      "contract_price": 284.00,
+      "list_price": 335.00,
+      "estimated_failure_date": "2026-05-28",
+      "in_stock": true,
+      "add_to_cart_url": "https://parts.example.com/cart?sku=EMIS-DPF-001&qty=1&cust=CUST-8842"
+    },
+    {
+      "rank": 2,
+      "urgency_level": "HIGH",
+      "urgency_score": 72.1,
+      "trigger_domain": "HYDRAULICS",
+      "trigger_signal": "pump_efficiency_% = 81",
+      "reason": "Hydraulic pump efficiency at 81% — below 85% threshold, replace within 200 hrs",
+      "oem_part_number": "OEM-9T-2528",
+      "part_name": "Hydraulic Pump Assembly",
+      "commerce_sku": "HYD-PUMP-320",
+      "quantity": 1,
+      "contract_price": 1240.00,
+      "list_price": 1480.00,
+      "estimated_failure_date": "2026-06-18",
+      "in_stock": true,
+      "add_to_cart_url": "https://parts.example.com/cart?sku=HYD-PUMP-320&qty=1&cust=CUST-8842"
+    },
+    {
+      "rank": 3,
+      "urgency_level": "MEDIUM",
+      "urgency_score": 48.5,
+      "trigger_domain": "ENGINE",
+      "trigger_signal": "engine_hours = 4920 (OEM interval: 5000 hrs)",
+      "reason": "Engine service due in 80 hrs — order service kit now",
+      "oem_part_number": "OEM-ENGINE-SVC-KIT-320",
+      "part_name": "Engine Service Kit (Oil Filter, Air Filter, Fuel Filter)",
+      "commerce_sku": "ENG-SVC-KIT-320",
+      "quantity": 1,
+      "contract_price": 187.00,
+      "list_price": 220.00,
+      "estimated_failure_date": null,
+      "in_stock": true,
+      "add_to_cart_url": "https://parts.example.com/cart?sku=ENG-SVC-KIT-320&qty=1&cust=CUST-8842"
+    }
+  ]
+}</div>
+
+<!-- SECTION 9 -->
+<h1>9. Sample NBA Payload → Customer Portal</h1>
+<div class="json-box">{
+  "machine_serial": "OEM-320-XJ4421",
+  "customer_id": "CUST-8842",
+  "generated_at": "2026-05-10T09:14:00Z",
+  "actions": [
+    {
+      "rank": 1,
+      "action_type": "IMMEDIATE",
+      "urgency_score": 96.2,
+      "trigger_domain": "STRUCTURAL",
+      "trigger_signal": "frame_stress_index = 96",
+      "action_text": "Remove machine from service immediately — structural stress above safe threshold. Inspection required before next operation.",
+      "recommended_dealer": "Authorized Dealer — Naperville, IL",
+      "dealer_phone": "630-555-0142",
+      "booking_url": "https://dealers.example.com/book?dealer=NAPERV&machine=XJ4421",
+      "push_notification_sent": true,
+      "sms_sent_to_operator": true
+    },
+    {
+      "rank": 2,
+      "action_type": "SCHEDULE",
+      "urgency_score": 71.8,
+      "trigger_domain": "HYDRAULICS",
+      "trigger_signal": "hydraulic_pressure_kpa = 180 (min: 200)",
+      "action_text": "Schedule hydraulic system inspection within 2 weeks. Pressure below safe operating threshold.",
+      "recommended_dealer": "Authorized Dealer — Naperville, IL",
+      "booking_url": "https://dealers.example.com/book?dealer=NAPERV&machine=XJ4421&type=HYD",
+      "estimated_service_hours": 3.5,
+      "estimated_service_cost": 420.00,
+      "push_notification_sent": true,
+      "sms_sent_to_operator": false
+    },
+    {
+      "rank": 3,
+      "action_type": "COACHING",
+      "urgency_score": 22.0,
+      "trigger_domain": "PRODUCTIVITY",
+      "trigger_signal": "idle_vs_working_ratio = 38% (benchmark: 20%)",
+      "action_text": "Machine idling 38% of operating time — 18% above fleet benchmark. Review operator behavior to reduce fuel costs.",
+      "coaching_resource_url": "https://member.example.com/training/idle-reduction",
+      "push_notification_sent": false,
+      "email_sent_to_fleet_manager": true
+    }
+  ]
+}</div>
+
+<!-- SECTION 10 -->
+<h1>10. Closed Loop — Feedback into Foundry</h1>
+<div class="section-intro">Every order placed in Commerce Platform and every service action taken feeds back into Foundry to improve future NBO/NBA recommendations.</div>
+
+<div class="object-box">Commerce Platform Order Confirmed
+          │
+          ▼ Webhook
+Foundry Pipeline:
+  1. Update WorkOrder object — parts_ordered []
+  2. Update Component object — last_replaced_date, reset wear_%
+  3. Update NBO_Recommendation — status = ORDERED
+  4. Log to /gold/order_history — feeds purchase propensity model retraining
+          │
+          ▼
+NBO Model Retrained (weekly):
+  New data: did customer buy? Which rank position?
+  Output: improved propensity scores for next cycle
+
+Service Completed (dealer confirmation)
+          │
+          ▼ Dealer system webhook
+Foundry Pipeline:
+  1. Update WorkOrder object — completion_date, technician, cost
+  2. Update Component object — reset health_score, wear_%
+  3. Update NBA_Recommendation — status = COMPLETED
+  4. Log to /gold/service_history — feeds failure prediction model retraining
+          │
+          ▼
+NBA Model Retrained (weekly):
+  New data: was predicted failure accurate? How far in advance?
+  Output: improved urgency scoring thresholds</div>
+
+<!-- SECTION 11 -->
+<h1>11. IAM Restrictions on NBO/NBA</h1>
+<table>
+  <tr><th>Role</th><th>NBO Access</th><th>NBA Access</th><th>Restriction</th></tr>
+  <tr><td>End Customer</td><td>Own machines only</td><td>Own machines only</td><td>Cannot see other customers' recommendations</td></tr>
+  <tr><td>Dealer</td><td>All machines in dealer network</td><td>All machines in dealer network</td><td>Cannot see machines assigned to other dealers</td></tr>
+  <tr><td>OEM Internal</td><td>Full fleet — all customers</td><td>Full fleet — all customers</td><td>Read-only on customer pricing data</td></tr>
+  <tr><td>Service Technician</td><td>No NBO access</td><td>Assigned machines only</td><td>NBA limited to active work orders</td></tr>
+  <tr><td>Fleet Manager</td><td>Own fleet only</td><td>Own fleet only — coaching NBAs visible</td><td>Cannot see individual operator IDs</td></tr>
+</table>
+
+<!-- SECTION 12 -->
+<div class="page-break"></div>
+<h1>12. NBO/NBA Serving Architecture — Precompute, Cache &amp; Serve</h1>
+<div class="section-intro">
+  Real-time NBO computation at serve time is not viable. The urgency scoring formula joins five Gold datasets per machine, applies suppression rules, ranks parts, and calls Commerce Platform for live pricing — 3–5 seconds per machine under load. The solution is a <strong>batch-precompute + serve-from-cache</strong> pattern: recommendations are scored hourly in Foundry, stored in a pre-computed Gold dataset, surfaced through the Ontology, and served by the Machine Domain API in under 400ms. The only component that runs live at serve time is the Commerce Platform pricing call for the top-ranked part.
+</div>
+
+<h3>End-to-End Serving Flow</h3>
+<div class="object-box">══════════════════════════════════════════════════════════════════════
+  PRECOMPUTE LAYER (Foundry — hourly batch, ~3–5 min total runtime)
+══════════════════════════════════════════════════════════════════════
+
+  [/gold/engine_health]──┐
+  [/gold/dpf_health]─────┤
+  [/gold/hydraulics_*]───┤──► NBO Scoring Transform (@transform_df)
+  [/gold/workorder_*]────┤        │  Applies urgency formula
+  [/gold/customer_*]─────┘        │  Applies suppression rules
+                                  │  Ranks top-5 parts per machine
+                                  ▼
+                    [/gold/nbo_recommendations]  ← Pre-computed store
+                    [/gold/nba_recommendations]    (one row per machine
+                                                   per recommended part)
+                                  │
+                                  ▼ (Ontology population transform, ~10 min lag)
+                    NboRecommendation objects in Foundry Ontology
+                    NbaRecommendation objects in Foundry Ontology
+
+══════════════════════════════════════════════════════════════════════
+  SERVE LAYER (Machine Domain API — per request, target p95 < 400ms)
+══════════════════════════════════════════════════════════════════════
+
+  Customer Portal → GET /machines/{serial}/recommendations
+        │
+        ▼
+  Machine Domain API
+        │
+        ├─ Read NboRecommendation objects from Ontology  [~30ms]
+        │   (pre-computed — no scoring at serve time)
+        │
+        ├─ Live pricing call to Commerce Platform REST API  [~150ms]
+        │   GET /rest/V1/products/{sku}/tier-prices?customer_group_id={id}
+        │   for the TOP-RANKED part only (not all 5)
+        │   Response cached per SKU for 15 minutes in API memory
+        │
+        └─ Assemble final NBO payload + signed deep link  [~10ms]
+                │
+                ▼
+        Customer Portal renders recommendations  [total: ~190ms p50]</div>
+
+<h3>Pre-Computed Store — /gold/nbo_recommendations Schema</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>machine_serial_number</code></td><td>String (PK, part 1)</td><td>Canonical MDM serial number</td></tr>
+  <tr><td><code>rank</code></td><td>Integer (PK, part 2)</td><td>1 = highest urgency, 5 = lowest. One row per machine per rank position.</td></tr>
+  <tr><td><code>oem_part_number</code></td><td>String</td><td>Recommended part OEM number</td></tr>
+  <tr><td><code>commerce_sku</code></td><td>String</td><td>Commerce Platform SKU — used for pricing call and deep link construction</td></tr>
+  <tr><td><code>urgency_score</code></td><td>Double</td><td>0.0–1.0 composite score from urgency formula</td></tr>
+  <tr><td><code>urgency_band</code></td><td>String</td><td>HIGH / MEDIUM / LOW — derived from urgency_score thresholds</td></tr>
+  <tr><td><code>urgency_reason</code></td><td>String</td><td>Human-readable reason string surfaced in portal (e.g., "Engine hours 87% of OEM limit")</td></tr>
+  <tr><td><code>nbo_suppressed</code></td><td>Boolean</td><td>True if suppression rule matched — row retained for audit but not served to portal</td></tr>
+  <tr><td><code>suppression_reason</code></td><td>String (nullable)</td><td>Why suppressed — e.g., "Replaced 12 days ago", "Open work order", "Customer opted out"</td></tr>
+  <tr><td><code>scored_at</code></td><td>Timestamp</td><td>When the scoring batch ran — used to compute recommendation age at serve time</td></tr>
+  <tr><td><code>valid_until</code></td><td>Timestamp</td><td><code>scored_at + 25 hours</code> — after this, the API treats the recommendation as stale and returns a degraded response</td></tr>
+  <tr><td><code>telemetry_domain</code></td><td>String</td><td>Source domain (ENGINE, DPF, HYDRAULICS, etc.)</td></tr>
+  <tr><td><code>contributing_signals</code></td><td>String (JSON)</td><td>Serialized breakdown of which signal drove the urgency score — used in portal tooltip and by support teams for debugging</td></tr>
+</table>
+
+<h3>Staleness Handling</h3>
+<table>
+  <tr><th>Scenario</th><th>Staleness Window</th><th>Behaviour</th></tr>
+  <tr><td><b>Normal operation</b></td><td>0–60 min (hourly batch)</td><td>Portal serves pre-computed recommendation. Age shown in UI: "Updated X minutes ago."</td></tr>
+  <tr><td><b>Batch delayed</b> (Silver pipeline slow)</td><td>60–105 min</td><td>API serves last good recommendation. Portal shows "Refreshing…" indicator. SLO alert fires at 105 min (Gold freshness breach).</td></tr>
+  <tr><td><b>Recommendation expired</b></td><td>&gt; 25 hours</td><td>API checks <code>valid_until</code> field. Returns a degraded response: machine health data only, no part recommendations. Portal shows "Recommendations temporarily unavailable — check back shortly."</td></tr>
+  <tr><td><b>Machine not yet scored</b> (new onboarding)</td><td>0–48 hr after onboarding</td><td>No row in <code>/gold/nbo_recommendations</code> for this serial. API returns 204 No Content. Portal shows "Recommendations will be available once telemetry history is established."</td></tr>
+  <tr><td><b>CRITICAL fault arrives mid-cycle</b></td><td>Up to 60 min lag</td><td>Year 1/2: stale recommendation persists until next hourly batch. The Alert object updates in &lt;90 sec via streaming path — portal shows the fault alert immediately even if NBO hasn't refreshed yet. Year 3: on-demand NBO re-score triggered within 30 sec (see below).</td></tr>
+</table>
+
+<h3>Commerce Platform Pricing Cache — Serve-Time Design</h3>
+<div class="object-box">Why only the top-ranked part gets a live pricing call:
+  ├─ Calling Commerce Platform for all 5 recommended parts = 5 × ~150ms = 750ms
+  │   This blows the p95 &lt; 400ms SLO.
+  ├─ Users almost never scroll past the #1 recommendation without acting.
+  └─ Remaining 4 parts are priced lazily — pricing call fires when user
+     expands the "View More" section, not on initial page load.
+
+Pricing cache design (in-memory, Machine Domain API):
+  Key:   {sku}:{customer_group_id}
+  TTL:   15 minutes
+  Size:  Top 500 SKUs × 5 customer group tiers = 2,500 cache entries
+  Miss:  Live Commerce Platform call (~150ms). On timeout (&gt;500ms): serve
+         "Price available at checkout" — never block page load on pricing.
+  Warm:  Cache pre-warmed on API startup with top-100 SKUs × all tiers.</div>
+
+<h3>Year 3 — Event-Sourced On-Demand Re-Score</h3>
+<div class="section-intro">
+  In Year 3, a CRITICAL fault event on the streaming path (Engine or DPF domain) triggers an immediate on-demand NBO re-score for that specific machine — bypassing the hourly batch for urgent cases. This closes the 0–60 minute gap where a customer with a failing engine sees stale NBO recommendations.
+</div>
+<div class="object-box">Year 3 — Critical Fault → On-Demand NBO Re-Score (target: &lt;30 sec end-to-end)
+
+[Kafka event: fault_code=CRITICAL, domain=ENGINE]
+        │
+        ▼ Magritte Kafka connector (streaming)
+[/bronze/engine_telemetry_raw] — new partition written
+        │
+        ▼ Streaming path (Engine/DPF only)
+Ontology Alert object updated (within 90 sec per SLO)
+        │
+        ▼ Foundry event trigger on new CRITICAL Alert object
+On-demand NBO scoring job fires for this serial_number only
+  ├─ Reads latest Gold data for this machine (single-machine query)
+  ├─ Runs urgency formula (scope: one machine, not full fleet)
+  ├─ Writes updated row to /gold/nbo_recommendations (overwrite for this serial)
+  └─ Ontology NboRecommendation object updated
+        │
+        ▼ Machine Domain API (next request for this serial)
+Portal renders updated HIGH-urgency recommendation
+  └─ Customer sees: "Engine fault detected — part replacement recommended now"
+
+Year 1/2: this path does not exist. Full hourly batch only.
+Year 3: on-demand path runs alongside hourly batch — batch remains the
+        source of truth for all non-critical domains.</div>
+
+<h3>NBA Serving Architecture — Fully Pre-Computed, No Live Call</h3>
+<div class="section-intro">
+  NBA recommendations follow the same batch-precompute pattern as NBO but are simpler at the serve layer: there is no live external call. Everything the portal needs — action type, urgency, machine context, dealer routing — is already in the <code>NbaRecommendation</code> Ontology object. The portal reads it directly and renders the action card in under 200ms.
+</div>
+<div class="object-box">══════════════════════════════════════════════════════════════════════
+  NBA PRECOMPUTE LAYER (Foundry — hourly batch)
+══════════════════════════════════════════════════════════════════════
+
+  [/gold/engine_health]──┐
+  [/gold/dpf_health]─────┤
+  [/gold/hydraulics_*]───┤──► NBA Scoring Transform
+  [/gold/workorder_*]────┤        │  Evaluates action thresholds
+  [/gold/dealer_routing]─┘        │  Selects action type (SCHEDULE_SERVICE,
+                                  │  SEND_TECHNICIAN, OPERATOR_COACHING, etc.)
+                                  │  Routes to correct dealer
+                                  ▼
+                    [/gold/nba_recommendations]  ← Pre-computed store
+                                  │
+                                  ▼ (Ontology population, ~10 min lag)
+                    NbaRecommendation objects in Foundry Ontology
+
+══════════════════════════════════════════════════════════════════════
+  NBA SERVE LAYER (Machine Domain API — per request, target p95 &lt; 200ms)
+══════════════════════════════════════════════════════════════════════
+
+  Dealer Portal / Customer Portal
+        │
+        ▼
+  Machine Domain API
+        │
+        └─ Read NbaRecommendation objects from Ontology  [~30ms]
+           (fully pre-computed — NO external call at serve time)
+                │
+                ▼
+        Portal renders action card:
+          "Schedule hydraulic service — estimated failure in 18 days"
+          [Schedule Service] button → creates work order in DMS</div>
+
+<h3>/gold/nba_recommendations Schema</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>machine_serial_number</code></td><td>String (PK, part 1)</td><td>Canonical MDM serial number</td></tr>
+  <tr><td><code>rank</code></td><td>Integer (PK, part 2)</td><td>1 = highest priority action. One row per machine per recommended action.</td></tr>
+  <tr><td><code>action_type</code></td><td>String</td><td>SCHEDULE_SERVICE / SEND_TECHNICIAN / OPERATOR_COACHING / FLUID_CHECK / INSPECT_NOW</td></tr>
+  <tr><td><code>action_urgency</code></td><td>String</td><td>IMMEDIATE / WITHIN_7_DAYS / WITHIN_30_DAYS / MONITOR</td></tr>
+  <tr><td><code>action_reason</code></td><td>String</td><td>Human-readable reason shown in portal — e.g., "Hydraulic pressure dropping 12% below baseline over 30 days"</td></tr>
+  <tr><td><code>assigned_dealer_id</code></td><td>String</td><td>Pre-computed dealer routing — which dealer should receive the service request</td></tr>
+  <tr><td><code>estimated_failure_days</code></td><td>Integer (nullable)</td><td>Predicted days until component failure — null if not calculable (insufficient history)</td></tr>
+  <tr><td><code>telemetry_domain</code></td><td>String</td><td>Source domain driving the action (ENGINE, HYDRAULICS, UNDERCARRIAGE, etc.)</td></tr>
+  <tr><td><code>nba_suppressed</code></td><td>Boolean</td><td>True if action already in progress — open work order for this machine and component type</td></tr>
+  <tr><td><code>scored_at</code></td><td>Timestamp</td><td>When the scoring batch ran</td></tr>
+  <tr><td><code>valid_until</code></td><td>Timestamp</td><td><code>scored_at + 25 hours</code> — same staleness window as NBO</td></tr>
+</table>
+
+<h3>NBA Closed Loop — Dealer Management System (DMS) Webhook</h3>
+<div class="object-box">Dealer accepts service action in portal
+        │
+        ▼  [Schedule Service] button → Machine Domain API
+Machine Domain API creates work order in DMS
+        │
+        ▼  DMS webhook → Foundry on service events
+  Event 1 — Work Order Created:
+    └─ Update NbaRecommendation → status = IN_PROGRESS
+    └─ Suppress re-recommendation (open work order rule)
+
+  Event 2 — Service Completed (dealer confirms in DMS):
+    └─ Update WorkOrder object — completion_date, technician, cost
+    └─ Update Component object — reset health_score, wear_%
+    └─ Update NbaRecommendation → status = COMPLETED
+    └─ Log to /gold/service_history → feeds failure prediction retraining
+
+  Event 3 — Work Order Cancelled / No Show:
+    └─ Update NbaRecommendation → status = CANCELLED
+    └─ Re-enable recommendation on next batch run (suppression lifted)</div>
+
+<h3>NBO vs NBA — Serving Architecture Side-by-Side</h3>
+<table>
+  <tr><th></th><th>NBO (Next Best Offer)</th><th>NBA (Next Best Action)</th></tr>
+  <tr><td><b>Pre-computed store</b></td><td><code>/gold/nbo_recommendations</code></td><td><code>/gold/nba_recommendations</code></td></tr>
+  <tr><td><b>Ontology object</b></td><td><code>NboRecommendation</code></td><td><code>NbaRecommendation</code></td></tr>
+  <tr><td><b>Live call at serve time</b></td><td>Yes — Commerce Platform pricing (rank 1, ~150ms)</td><td>None — fully pre-computed</td></tr>
+  <tr><td><b>Target p95 serve latency</b></td><td>&lt; 400ms (includes pricing call)</td><td>&lt; 200ms (Ontology read only)</td></tr>
+  <tr><td><b>Portal action</b></td><td>Signed deep link → Commerce Platform cart</td><td>Schedule Service → DMS work order creation</td></tr>
+  <tr><td><b>Primary consumer</b></td><td>Customer / fleet manager (buy parts)</td><td>Dealer / service technician (do service)</td></tr>
+  <tr><td><b>Closed loop source</b></td><td>Commerce Platform order confirmed webhook</td><td>DMS service completion webhook</td></tr>
+  <tr><td><b>Suppression trigger</b></td><td>Part ordered or replaced within 30 days</td><td>Open work order exists for this machine + component</td></tr>
+  <tr><td><b>Staleness window</b></td><td>0–60 min (hourly batch); 25hr expiry</td><td>0–60 min (hourly batch); 25hr expiry</td></tr>
+  <tr><td><b>Year 3 on-demand re-score</b></td><td>Yes — CRITICAL fault triggers immediate re-score</td><td>Yes — CRITICAL fault triggers immediate re-score; dealer also notified via push alert</td></tr>
+</table>
+
+<h3>What Is Real-Time vs Pre-Computed — Full Summary</h3>
+<table>
+  <tr><th>Component</th><th>Computed When</th><th>Latency to Portal</th><th>Stale Risk</th></tr>
+  <tr><td>Machine fault alert (Engine/DPF)</td><td>Streaming — on event arrival</td><td>&lt;90 sec (streaming SLO)</td><td>None — event-sourced</td></tr>
+  <tr><td>Machine overall health score</td><td>Batch — hourly Gold transform</td><td>0–60 min lag</td><td>Up to 60 min</td></tr>
+  <tr><td>NBO part recommendations (rank 1–5)</td><td>Batch — hourly NBO scoring job</td><td>0–60 min lag</td><td>Up to 60 min (25hr expiry)</td></tr>
+  <tr><td>NBA service recommendations</td><td>Batch — hourly NBA scoring job</td><td>0–60 min lag</td><td>Up to 60 min (25hr expiry)</td></tr>
+  <tr><td>Commerce Platform price — NBO rank 1</td><td>Live at serve time (NBO only)</td><td>&lt;150ms (15min cache)</td><td>15 min (cache TTL)</td></tr>
+  <tr><td>Commerce Platform price — NBO ranks 2–5</td><td>Live on user expand, lazy (NBO only)</td><td>&lt;150ms on demand</td><td>15 min (cache TTL)</td></tr>
+  <tr><td>DMS work order creation (NBA)</td><td>Live on dealer action (NBA only)</td><td>Synchronous on button click</td><td>N/A — write operation</td></tr>
+  <tr><td>On-demand NBO/NBA re-score (Year 3)</td><td>Event-triggered on CRITICAL fault</td><td>&lt;30 sec end-to-end</td><td>None for CRITICAL faults</td></tr>
+</table>
+
+<br><br>
+<hr>
+<p style="text-align:center; color:#999; font-size:11px;">NBO/NBA Engine Data Model & Decision Framework &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+
+</body>
+</html>

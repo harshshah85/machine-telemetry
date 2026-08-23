@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Palantir Foundry — Machine Telemetry Ontology</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 40px; color: #222; }
+  h1 { color: #1a1a2e; font-size: 22px; border-bottom: 3px solid #e63946; padding-bottom: 8px; }
+  h2 { color: #1a1a2e; font-size: 16px; margin-top: 32px; border-left: 4px solid #e63946; padding-left: 10px; }
+  h3 { color: #457b9d; font-size: 14px; margin-top: 16px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }
+  th { background-color: #1a1a2e; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #ddd; font-size: 12px; vertical-align: top; }
+  tr:nth-child(even) { background-color: #f8f9fa; }
+  .section-intro { background: #eaf4fb; border-left: 4px solid #457b9d; padding: 8px 12px; margin: 8px 0 16px 0; font-size: 12px; }
+  .object-box { background: #f0f4f8; border: 1px solid #ccd6e0; border-radius: 6px; padding: 12px; margin: 10px 0; font-family: monospace; font-size: 12px; white-space: pre; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 60px 0 40px 0; }
+  .cover h1 { border: none; font-size: 28px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+  .obj  { background:#1a1a2e; color:white; }
+  .prop { background:#457b9d; color:white; }
+  .link { background:#e63946; color:white; }
+  .act  { background:#2a9d8f; color:white; }
+
+  /* ── Ontology Diagram ── */
+  .diagram-wrap { overflow-x: auto; margin: 20px 0; }
+  svg text { font-family: Arial, sans-serif; }
+  .obj-rect { fill: #1a1a2e; rx: 6; ry: 6; }
+  .obj-label { fill: white; font-size: 12px; font-weight: bold; text-anchor: middle; dominant-baseline: middle; }
+  .prop-rect { fill: #eaf4fb; stroke: #457b9d; stroke-width: 1.5; }
+  .link-line { stroke: #e63946; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+  .link-label { fill: #e63946; font-size: 10px; text-anchor: middle; }
+  .toc { background: #f8f9fa; border: 1px solid #ddd; padding: 20px 30px; margin: 30px 0; }
+  .toc ol { margin: 0; padding-left: 20px; line-height: 2; }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>Palantir Foundry Ontology</h1>
+  <h2 style="border:none;font-size:20px;color:#457b9d;">Machine Telemetry Platform</h2>
+  <p>Object Types · Property Types · Link Types · Action Types</p>
+  <p style="color:#999;font-size:11px;">Prepared by Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</div>
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li>Ontology Visual Diagram</li>
+    <li>Object Type Definitions</li>
+    <li>Link Type Definitions</li>
+    <li>Property Type Registry</li>
+    <li>Action Type Definitions</li>
+    <li>IAM — Object-Level Access Control</li>
+  </ol>
+</div>
+
+<!-- SECTION 1 — DIAGRAM -->
+<h1>1. Ontology Visual Diagram</h1>
+<div class="section-intro">
+  Each box is an <b>Object Type</b>. Red arrows are <b>Link Types</b> (relationships). The Machine object is the central hub connecting all domains.
+</div>
+
+<div class="diagram-wrap">
+<svg width="980" height="720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#e63946"/>
+    </marker>
+  </defs>
+
+  <!-- ── Row 1: Fleet, JobSite, Operator ── -->
+  <!-- Fleet -->
+  <rect x="40" y="30" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="105" y="50" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Fleet</text>
+
+  <!-- JobSite -->
+  <rect x="410" y="30" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="475" y="50" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">JobSite</text>
+
+  <!-- Operator -->
+  <rect x="780" y="30" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="845" y="50" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Operator</text>
+
+  <!-- ── Row 2: Customer, Machine (center), TelemetryEvent ── -->
+  <!-- Customer -->
+  <rect x="40" y="170" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="105" y="190" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Customer</text>
+
+  <!-- Machine (central) -->
+  <rect x="390" y="155" width="170" height="70" rx="8" fill="#e63946"/>
+  <text x="475" y="186" fill="white" font-size="14" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Machine</text>
+  <text x="475" y="204" fill="white" font-size="10" text-anchor="middle">(Central Object)</text>
+
+  <!-- TelemetryEvent -->
+  <rect x="780" y="170" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="845" y="182" fill="white" font-size="11" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Telemetry</text>
+  <text x="845" y="198" fill="white" font-size="11" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Event</text>
+
+  <!-- ── Row 3: Dealer, Component, Part ── -->
+  <!-- Dealer -->
+  <rect x="40" y="330" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="105" y="350" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Dealer</text>
+
+  <!-- Component -->
+  <rect x="390" y="330" width="170" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="475" y="350" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Component</text>
+
+  <!-- Part -->
+  <rect x="780" y="330" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="845" y="350" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Part</text>
+
+  <!-- ── Row 4: Alert, WorkOrder ── -->
+  <!-- Alert -->
+  <rect x="230" y="490" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="295" y="510" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Alert</text>
+
+  <!-- WorkOrder -->
+  <rect x="590" y="490" width="130" height="40" rx="6" fill="#1a1a2e"/>
+  <text x="655" y="510" fill="white" font-size="12" font-weight="bold" text-anchor="middle" dominant-baseline="middle">WorkOrder</text>
+
+  <!-- ── Row 5: NBO_Recommendation, NBA_Recommendation ── -->
+  <!-- NBO -->
+  <rect x="100" y="640" width="170" height="40" rx="6" fill="#2a9d8f"/>
+  <text x="185" y="652" fill="white" font-size="11" font-weight="bold" text-anchor="middle" dominant-baseline="middle">NBO</text>
+  <text x="185" y="668" fill="white" font-size="10" text-anchor="middle">Recommendation</text>
+
+  <!-- NBA -->
+  <rect x="680" y="640" width="170" height="40" rx="6" fill="#e76f51"/>
+  <text x="765" y="652" fill="white" font-size="11" font-weight="bold" text-anchor="middle" dominant-baseline="middle">NBA</text>
+  <text x="765" y="668" fill="white" font-size="10" text-anchor="middle">Recommendation</text>
+
+  <!-- ════════════════════════════
+       LINK LINES
+  ════════════════════════════ -->
+
+  <!-- Fleet → Machine: CONTAINS -->
+  <line x1="170" y1="55" x2="390" y2="168" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="270" y="95" fill="#e63946" font-size="10" text-anchor="middle">CONTAINS</text>
+
+  <!-- JobSite → Machine: HOSTS -->
+  <line x1="475" y1="70" x2="475" y2="155" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="500" y="115" fill="#e63946" font-size="10">HOSTS</text>
+
+  <!-- Operator → Machine: OPERATES -->
+  <line x1="780" y1="55" x2="560" y2="168" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="690" y="95" fill="#e63946" font-size="10" text-anchor="middle">OPERATES</text>
+
+  <!-- Customer → Machine: OWNS -->
+  <line x1="170" y1="190" x2="390" y2="190" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="280" y="183" fill="#e63946" font-size="10" text-anchor="middle">OWNS</text>
+
+  <!-- Machine → TelemetryEvent: GENERATES -->
+  <line x1="560" y1="190" x2="780" y2="190" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="670" y="183" fill="#e63946" font-size="10" text-anchor="middle">GENERATES</text>
+
+  <!-- Customer → Dealer: SERVED_BY -->
+  <line x1="105" y1="210" x2="105" y2="330" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="60" y="275" fill="#e63946" font-size="10">SERVED_BY</text>
+
+  <!-- Machine → Component: HAS_COMPONENT -->
+  <line x1="475" y1="225" x2="475" y2="330" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="510" y="280" fill="#e63946" font-size="10">HAS</text>
+
+  <!-- Dealer → Machine: SERVICES -->
+  <line x1="170" y1="345" x2="390" y2="215" stroke="#e63946" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+  <text x="265" y="295" fill="#e63946" font-size="10" text-anchor="middle">SERVICES</text>
+
+  <!-- Component → Part: REQUIRES_PART -->
+  <line x1="560" y1="350" x2="780" y2="350" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="670" y="343" fill="#e63946" font-size="10" text-anchor="middle">REQUIRES</text>
+
+  <!-- Machine → Alert: TRIGGERS -->
+  <line x1="430" y1="225" x2="320" y2="490" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="355" y="380" fill="#e63946" font-size="10" text-anchor="middle">TRIGGERS</text>
+
+  <!-- Machine → WorkOrder: HAS -->
+  <line x1="520" y1="225" x2="630" y2="490" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="600" y="380" fill="#e63946" font-size="10" text-anchor="middle">HAS</text>
+
+  <!-- Alert → WorkOrder: ACTIONED_BY -->
+  <line x1="360" y1="510" x2="590" y2="510" stroke="#e63946" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="475" y="503" fill="#e63946" font-size="10" text-anchor="middle">ACTIONED_BY</text>
+
+  <!-- Component → Alert: TRIGGERS_ALERT -->
+  <line x1="430" y1="370" x2="330" y2="490" stroke="#e63946" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+  <text x="365" y="440" fill="#e63946" font-size="10" text-anchor="middle">TRIGGERS</text>
+
+  <!-- Machine → NBO -->
+  <line x1="415" y1="225" x2="220" y2="640" stroke="#2a9d8f" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="290" y="460" fill="#2a9d8f" font-size="10" text-anchor="middle">HAS_NBO</text>
+
+  <!-- Machine → NBA -->
+  <line x1="535" y1="225" x2="720" y2="640" stroke="#e76f51" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="660" y="460" fill="#e76f51" font-size="10" text-anchor="middle">HAS_NBA</text>
+
+  <!-- NBO → Part -->
+  <line x1="270" y1="655" x2="780" y2="358" stroke="#2a9d8f" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <text x="530" y="590" fill="#2a9d8f" font-size="10" text-anchor="middle">LINKS_PART</text>
+
+  <!-- LEGEND -->
+  <rect x="40" y="590" width="14" height="3" fill="#e63946"/>
+  <text x="60" y="596" font-size="10" fill="#333">Structural relationship</text>
+  <rect x="40" y="610" width="14" height="3" fill="#e63946" stroke-dasharray="4,2"/>
+  <line x1="40" y1="613" x2="54" y2="613" stroke="#e63946" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="60" y="616" font-size="10" fill="#333">Derived / service relationship</text>
+  <rect x="40" y="630" width="14" height="10" rx="2" fill="#2a9d8f"/>
+  <text x="60" y="638" font-size="10" fill="#333">NBO object</text>
+  <rect x="140" y="630" width="14" height="10" rx="2" fill="#e76f51"/>
+  <text x="160" y="638" font-size="10" fill="#333">NBA object</text>
+  <rect x="240" y="630" width="14" height="10" rx="2" fill="#e63946"/>
+  <text x="260" y="638" font-size="10" fill="#333">Central Machine object</text>
+</svg>
+</div>
+
+<!-- SECTION 2 — OBJECT TYPE DEFINITIONS -->
+<div class="page-break"></div>
+<h1>2. Object Type Definitions</h1>
+<div class="section-intro">Each Object Type maps to a dataset in the Foundry Gold layer. Primary keys are used as the unique identifier across all link types.</div>
+
+<!-- MACHINE -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; Machine</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>serial_number <b>(PK)</b></td><td>String</td><td>machine_serial_number</td><td>Unique machine identifier</td></tr>
+  <tr><td>model_code</td><td>String</td><td>machine_model</td><td>e.g. EX-320, DZ-6, HT-775</td></tr>
+  <tr><td>manufacture_year</td><td>Integer</td><td>mfg_year</td><td>Year manufactured</td></tr>
+  <tr><td>fleet_owner_id</td><td>String (FK→Customer)</td><td>customer_id</td><td>Links to Customer object</td></tr>
+  <tr><td>dealer_id</td><td>String (FK→Dealer)</td><td>dealer_code</td><td>Assigned dealer</td></tr>
+  <tr><td>warranty_status</td><td>Enum</td><td>warranty_flag</td><td>ACTIVE / EXPIRED / NONE</td></tr>
+  <tr><td>warranty_expiry_date</td><td>Date</td><td>warranty_exp_dt</td><td></td></tr>
+  <tr><td>overall_health_score</td><td>Float</td><td>Calculated</td><td>0-100, weighted avg of all components</td></tr>
+  <tr><td>health_status</td><td>Enum</td><td>Derived</td><td>GOOD / FAIR / POOR / CRITICAL</td></tr>
+  <tr><td>active_fault_count</td><td>Integer</td><td>Calculated</td><td>Count of open alerts</td></tr>
+  <tr><td>critical_fault_count</td><td>Integer</td><td>Calculated</td><td>Count of CRITICAL alerts</td></tr>
+  <tr><td>predicted_failure_days</td><td>Integer</td><td>ML model output</td><td>Days until predicted failure</td></tr>
+  <tr><td>last_telemetry_timestamp</td><td>Timestamp</td><td>last_telemetry_ts</td><td>Freshness indicator</td></tr>
+  <tr><td>operating_region</td><td>String</td><td>geo_region</td><td>Geographic operating region</td></tr>
+</table>
+
+<!-- COMPONENT -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; Component</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>component_id <b>(PK)</b></td><td>String</td><td>component_id</td><td>Unique component identifier</td></tr>
+  <tr><td>machine_serial_number <b>(FK)</b></td><td>String</td><td>machine_serial_number</td><td>Parent Machine</td></tr>
+  <tr><td>component_type</td><td>Enum</td><td>component_type</td><td>ENGINE / HYDRAULICS / UNDERCARRIAGE / ELECTRICAL / TRANSMISSION / FUEL_EMISSIONS</td></tr>
+  <tr><td>component_name</td><td>String</td><td>component_name</td><td>e.g. "Hydraulic Pump A"</td></tr>
+  <tr><td>health_score</td><td>Float</td><td>Calculated</td><td>0-100</td></tr>
+  <tr><td>wear_percentage</td><td>Float</td><td>Calculated</td><td>% worn vs. OEM lifespan</td></tr>
+  <tr><td>estimated_hours_left</td><td>Integer</td><td>ML model output</td><td>Hours before replacement needed</td></tr>
+  <tr><td>recommended_action</td><td>Enum</td><td>Derived</td><td>MONITOR / SERVICE_SOON / REPLACE_NOW</td></tr>
+  <tr><td>last_serviced_date</td><td>Date</td><td>workorder_history</td><td>Date of last service</td></tr>
+  <tr><td>last_replaced_date</td><td>Date</td><td>workorder_history</td><td>Date of last replacement</td></tr>
+  <tr><td>oem_part_number</td><td>String (FK→Part)</td><td>oem_part_number</td><td>Links to Part object</td></tr>
+  <tr><td>telemetry_signals []</td><td>Array</td><td>Multi-source</td><td>All telemetry readings for this component</td></tr>
+</table>
+
+<!-- ALERT -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; Alert</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>alert_id <b>(PK)</b></td><td>String</td><td>alert_id</td><td>Unique alert ID</td></tr>
+  <tr><td>machine_serial_number <b>(FK)</b></td><td>String</td><td>machine_serial_number</td><td>Parent Machine</td></tr>
+  <tr><td>component_id <b>(FK)</b></td><td>String</td><td>component_id</td><td>Component that triggered alert</td></tr>
+  <tr><td>fault_code</td><td>String</td><td>fault_code</td><td>ECM fault code e.g. "E0342"</td></tr>
+  <tr><td>fault_description</td><td>String</td><td>fault_description</td><td>Human-readable description</td></tr>
+  <tr><td>telemetry_domain</td><td>Enum</td><td>domain</td><td>ENGINE / HYDRAULICS / STRUCTURAL etc.</td></tr>
+  <tr><td>severity</td><td>Enum</td><td>severity</td><td>INFO / WARNING / CRITICAL</td></tr>
+  <tr><td>triggered_timestamp</td><td>Timestamp</td><td>triggered_ts</td><td>When fault occurred</td></tr>
+  <tr><td>resolved_timestamp</td><td>Timestamp</td><td>resolved_ts</td><td>Null if still open</td></tr>
+  <tr><td>status</td><td>Enum</td><td>Derived</td><td>OPEN / IN_PROGRESS / RESOLVED</td></tr>
+  <tr><td>recommended_nba</td><td>String (FK→NBA)</td><td>nba_id</td><td>Links to NBA recommendation</td></tr>
+  <tr><td>assigned_workorder_id</td><td>String (FK→WorkOrder)</td><td>workorder_id</td><td>If actioned — links to WorkOrder</td></tr>
+  <tr><td>notification_sent_flag</td><td>Boolean</td><td>Derived</td><td>Push/SMS dispatched</td></tr>
+</table>
+
+<!-- WORKORDER -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; WorkOrder</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>workorder_id <b>(PK)</b></td><td>String</td><td>workorder_id</td><td>Unique work order ID</td></tr>
+  <tr><td>machine_serial_number <b>(FK)</b></td><td>String</td><td>machine_serial_number</td><td>Machine being serviced</td></tr>
+  <tr><td>dealer_id <b>(FK)</b></td><td>String</td><td>dealer_id</td><td>Dealer performing service</td></tr>
+  <tr><td>technician_id</td><td>String</td><td>technician_id</td><td>Assigned technician</td></tr>
+  <tr><td>service_type</td><td>Enum</td><td>service_type</td><td>PREVENTIVE / CORRECTIVE / INSPECTION / EMERGENCY</td></tr>
+  <tr><td>status</td><td>Enum</td><td>status</td><td>OPEN / IN_PROGRESS / COMPLETED / CANCELLED</td></tr>
+  <tr><td>open_date</td><td>Date</td><td>open_dt</td><td>When work order was created</td></tr>
+  <tr><td>completion_date</td><td>Date</td><td>completion_dt</td><td>When service was completed</td></tr>
+  <tr><td>parts_replaced []</td><td>Array (FK→Part)</td><td>parts_list</td><td>Parts used in service</td></tr>
+  <tr><td>total_cost</td><td>Float</td><td>total_cost</td><td>Labour + parts cost</td></tr>
+  <tr><td>technician_notes</td><td>String</td><td>notes</td><td>Free text service notes</td></tr>
+  <tr><td>triggering_alert_id</td><td>String (FK→Alert)</td><td>alert_id</td><td>Alert that created this work order</td></tr>
+</table>
+
+<!-- CUSTOMER -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; Customer</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>customer_id <b>(PK)</b></td><td>String</td><td>customer_id</td><td>Unique customer ID</td></tr>
+  <tr><td>customer_name</td><td>String</td><td>customer_name</td><td>Company or individual name</td></tr>
+  <tr><td>account_tier</td><td>Enum</td><td>account_tier</td><td>STANDARD / SILVER / GOLD / PLATINUM</td></tr>
+  <tr><td>contract_type</td><td>Enum</td><td>contract_type</td><td>STANDARD / CAT_ADVANTAGE / CUSTOM</td></tr>
+  <tr><td>dealer_id <b>(FK)</b></td><td>String</td><td>dealer_id</td><td>Assigned dealer</td></tr>
+  <tr><td>preferred_dealer_id</td><td>String</td><td>preferred_dealer</td><td>Customer's preferred service dealer</td></tr>
+  <tr><td>machines []</td><td>Array (FK→Machine)</td><td>machine_list</td><td>All owned machines</td></tr>
+  <tr><td>purchase_history []</td><td>Array</td><td>order_history</td><td>Historical parts orders</td></tr>
+  <tr><td>nbo_opt_out_flag</td><td>Boolean</td><td>nbo_opt_out</td><td>Suppress NBO if true</td></tr>
+  <tr><td>iam_group_id</td><td>String</td><td>idp_group</td><td>Maps to IAM role in Foundry</td></tr>
+</table>
+
+<!-- DEALER -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; Dealer</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>dealer_id <b>(PK)</b></td><td>String</td><td>dealer_id</td><td>Unique dealer ID</td></tr>
+  <tr><td>dealer_name</td><td>String</td><td>dealer_name</td><td>Dealership name</td></tr>
+  <tr><td>region</td><td>String</td><td>region</td><td>Geographic service region</td></tr>
+  <tr><td>address</td><td>String</td><td>address</td><td>Physical location</td></tr>
+  <tr><td>service_capacity</td><td>Integer</td><td>capacity</td><td>Open service bays</td></tr>
+  <tr><td>booking_url</td><td>String</td><td>booking_url</td><td>Deep link to dealer scheduling</td></tr>
+  <tr><td>machines_served []</td><td>Array (FK→Machine)</td><td>machine_list</td><td>All machines in dealer territory</td></tr>
+</table>
+
+<!-- PART -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; Part</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>oem_part_number <b>(PK)</b></td><td>String</td><td>oem_part_number</td><td>OEM part number</td></tr>
+  <tr><td>part_name</td><td>String</td><td>part_name</td><td>Human-readable part name</td></tr>
+  <tr><td>part_category</td><td>Enum</td><td>category</td><td>ENGINE / HYDRAULICS / UNDERCARRIAGE / FILTER / ELECTRICAL / EMISSIONS</td></tr>
+  <tr><td>compatible_models []</td><td>Array</td><td>model_list</td><td>Machine models this part fits</td></tr>
+  <tr><td>compatible_component_types []</td><td>Array</td><td>component_types</td><td>Component types this part replaces</td></tr>
+  <tr><td>avg_lifespan_hours</td><td>Integer</td><td>oem_lifespan_hrs</td><td>OEM rated life in engine hours</td></tr>
+  <tr><td>avg_lifespan_cycles</td><td>Integer</td><td>oem_lifespan_cycles</td><td>OEM rated life in load cycles</td></tr>
+  <tr><td>replacement_urgency</td><td>Enum</td><td>Derived</td><td>ROUTINE / SOON / IMMEDIATE</td></tr>
+  <tr><td>commerce_sku</td><td>String</td><td>commerce_sku</td><td>Direct Commerce Platform product SKU</td></tr>
+  <tr><td>superseded_by</td><td>String</td><td>superseded_by</td><td>Newer part number if discontinued</td></tr>
+  <tr><td>in_stock_flag</td><td>Boolean</td><td>Commerce Platform API</td><td>Live inventory check</td></tr>
+</table>
+
+<!-- FLEET -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; Fleet</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>fleet_id <b>(PK)</b></td><td>String</td><td>fleet_id</td><td>Unique fleet ID</td></tr>
+  <tr><td>customer_id <b>(FK)</b></td><td>String</td><td>customer_id</td><td>Fleet owner</td></tr>
+  <tr><td>fleet_name</td><td>String</td><td>fleet_name</td><td>Customer-defined fleet name</td></tr>
+  <tr><td>machines []</td><td>Array (FK→Machine)</td><td>machine_list</td><td>All machines in fleet</td></tr>
+  <tr><td>avg_fleet_health_score</td><td>Float</td><td>Calculated</td><td>Average health across all machines</td></tr>
+  <tr><td>critical_machine_count</td><td>Integer</td><td>Calculated</td><td>Machines with CRITICAL status</td></tr>
+  <tr><td>total_engine_hours</td><td>Float</td><td>Aggregated</td><td>Sum of all machine hours</td></tr>
+</table>
+
+<!-- JOBSITE -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; JobSite</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>jobsite_id <b>(PK)</b></td><td>String</td><td>jobsite_id</td><td>Unique job site ID</td></tr>
+  <tr><td>jobsite_name</td><td>String</td><td>jobsite_name</td><td>Project or site name</td></tr>
+  <tr><td>geofence_coordinates</td><td>GeoJSON</td><td>geofence_coords</td><td>Polygon defining site boundary</td></tr>
+  <tr><td>assigned_machines []</td><td>Array (FK→Machine)</td><td>machine_list</td><td>Machines currently on site</td></tr>
+  <tr><td>customer_id <b>(FK)</b></td><td>String</td><td>customer_id</td><td>Site owner</td></tr>
+  <tr><td>active_flag</td><td>Boolean</td><td>active</td><td>Site currently active</td></tr>
+</table>
+
+<!-- OPERATOR -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; Operator</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>operator_id <b>(PK)</b></td><td>String</td><td>operator_id</td><td>RFID/PIN operator ID</td></tr>
+  <tr><td>operator_name</td><td>String</td><td>operator_name</td><td>Operator name</td></tr>
+  <tr><td>certifications []</td><td>Array</td><td>cert_list</td><td>Machine certifications held</td></tr>
+  <tr><td>avg_idle_ratio</td><td>Float</td><td>Calculated</td><td>Avg idle % across all sessions</td></tr>
+  <tr><td>harsh_operation_count</td><td>Integer</td><td>Calculated</td><td>Overload/aggressive events count</td></tr>
+  <tr><td>machines_operated []</td><td>Array (FK→Machine)</td><td>session_history</td><td>All machines operated</td></tr>
+  <tr><td>coaching_flag</td><td>Boolean</td><td>Derived</td><td>True if NBA coaching recommended</td></tr>
+</table>
+
+<!-- TELEMETRY EVENT -->
+<h2><span class="badge obj">OBJECT TYPE</span> &nbsp; TelemetryEvent</h2>
+<table>
+  <tr><th>Property</th><th>Type</th><th>Source Field</th><th>Description</th></tr>
+  <tr><td>event_id <b>(PK)</b></td><td>String</td><td>event_id</td><td>Unique event ID</td></tr>
+  <tr><td>machine_serial_number <b>(FK)</b></td><td>String</td><td>machine_serial_number</td><td>Source machine</td></tr>
+  <tr><td>timestamp</td><td>Timestamp</td><td>event_ts</td><td>Time of reading</td></tr>
+  <tr><td>telemetry_domain</td><td>Enum</td><td>domain</td><td>ENGINE / HYDRAULICS / EMISSIONS etc.</td></tr>
+  <tr><td>signal_name</td><td>String</td><td>signal_name</td><td>e.g. "engine_temp_c"</td></tr>
+  <tr><td>signal_value</td><td>Float</td><td>signal_value</td><td>Sensor reading</td></tr>
+  <tr><td>unit</td><td>String</td><td>unit</td><td>°C / kPa / % / hrs / RPM</td></tr>
+  <tr><td>within_threshold</td><td>Boolean</td><td>Derived</td><td>False = alert candidate</td></tr>
+</table>
+
+<!-- SECTION 3 — LINK TYPES -->
+<div class="page-break"></div>
+<h1>3. Link Type Definitions</h1>
+<div class="section-intro">Link Types define relationships between Object Types. Each link has a direction, cardinality, and a label describing the relationship.</div>
+
+<table>
+  <tr><th>Link Type</th><th>From Object</th><th>To Object</th><th>Cardinality</th><th>Description</th></tr>
+  <tr><td><span class="badge link">CONTAINS</span></td><td>Fleet</td><td>Machine</td><td>One-to-Many</td><td>A fleet contains one or more machines</td></tr>
+  <tr><td><span class="badge link">OWNS</span></td><td>Customer</td><td>Machine</td><td>One-to-Many</td><td>A customer owns one or more machines</td></tr>
+  <tr><td><span class="badge link">SERVED_BY</span></td><td>Customer</td><td>Dealer</td><td>Many-to-One</td><td>A customer is assigned to a dealer</td></tr>
+  <tr><td><span class="badge link">OPERATES</span></td><td>Operator</td><td>Machine</td><td>Many-to-Many</td><td>An operator can run multiple machines; a machine can have multiple operators</td></tr>
+  <tr><td><span class="badge link">HOSTS</span></td><td>JobSite</td><td>Machine</td><td>One-to-Many</td><td>A job site hosts one or more machines (geofence-based assignment)</td></tr>
+  <tr><td><span class="badge link">HAS_COMPONENT</span></td><td>Machine</td><td>Component</td><td>One-to-Many</td><td>A machine has multiple components across all telemetry domains</td></tr>
+  <tr><td><span class="badge link">GENERATES</span></td><td>Machine</td><td>TelemetryEvent</td><td>One-to-Many</td><td>A machine generates continuous telemetry events (time-series)</td></tr>
+  <tr><td><span class="badge link">TRIGGERS_ALERT</span></td><td>Machine</td><td>Alert</td><td>One-to-Many</td><td>Machine-level fault codes trigger alerts</td></tr>
+  <tr><td><span class="badge link">COMPONENT_ALERT</span></td><td>Component</td><td>Alert</td><td>One-to-Many</td><td>Component-level threshold breach triggers alert</td></tr>
+  <tr><td><span class="badge link">REQUIRES_PART</span></td><td>Component</td><td>Part</td><td>Many-to-One</td><td>A component maps to its replacement OEM part</td></tr>
+  <tr><td><span class="badge link">HAS_WORKORDER</span></td><td>Machine</td><td>WorkOrder</td><td>One-to-Many</td><td>A machine has a history of work orders</td></tr>
+  <tr><td><span class="badge link">ACTIONED_BY</span></td><td>Alert</td><td>WorkOrder</td><td>Many-to-One</td><td>An alert triggers the creation of a work order</td></tr>
+  <tr><td><span class="badge link">SERVICED_BY</span></td><td>WorkOrder</td><td>Dealer</td><td>Many-to-One</td><td>A work order is fulfilled by a dealer</td></tr>
+  <tr><td><span class="badge link">USES_PART</span></td><td>WorkOrder</td><td>Part</td><td>Many-to-Many</td><td>A work order uses one or more parts</td></tr>
+  <tr><td><span class="badge link">HAS_NBO</span></td><td>Machine</td><td>NBO_Recommendation</td><td>One-to-Many</td><td>A machine has active NBO recommendations</td></tr>
+  <tr><td><span class="badge link">HAS_NBA</span></td><td>Machine</td><td>NBA_Recommendation</td><td>One-to-Many</td><td>A machine has active NBA recommendations</td></tr>
+  <tr><td><span class="badge link">LINKS_PART</span></td><td>NBO_Recommendation</td><td>Part</td><td>Many-to-One</td><td>An NBO recommendation links to a specific part in the catalog</td></tr>
+  <tr><td><span class="badge link">CUSTOMER_NBO</span></td><td>Customer</td><td>NBO_Recommendation</td><td>One-to-Many</td><td>Customer-scoped NBO view (all machines)</td></tr>
+  <tr><td><span class="badge link">CUSTOMER_NBA</span></td><td>Customer</td><td>NBA_Recommendation</td><td>One-to-Many</td><td>Customer-scoped NBA view (all machines)</td></tr>
+</table>
+
+<!-- SECTION 4 — PROPERTY TYPE REGISTRY -->
+<h1>4. Property Type Registry</h1>
+<div class="section-intro">Shared property types used across multiple objects — ensures consistency in naming and data types across the ontology.</div>
+
+<table>
+  <tr><th>Property Type</th><th>Data Type</th><th>Used In Objects</th><th>Description</th></tr>
+  <tr><td>health_score</td><td>Float (0-100)</td><td>Machine, Component, Fleet</td><td>Standardized 0-100 health scale across all objects</td></tr>
+  <tr><td>urgency_level</td><td>Enum</td><td>Alert, NBO, NBA</td><td>CRITICAL / HIGH / MEDIUM / ROUTINE</td></tr>
+  <tr><td>status</td><td>Enum</td><td>Alert, WorkOrder, NBO, NBA</td><td>OPEN/ACTIVE / IN_PROGRESS / COMPLETED / DISMISSED</td></tr>
+  <tr><td>timestamp</td><td>Timestamp (UTC)</td><td>All objects</td><td>All timestamps stored in UTC, displayed in local tz on portal</td></tr>
+  <tr><td>serial_number / _id</td><td>String (UUID)</td><td>All objects</td><td>All primary keys are system-generated UUIDs except machine_serial_number</td></tr>
+  <tr><td>iam_group_id</td><td>String</td><td>Customer, Dealer, Operator</td><td>Maps to IdP (Okta/Azure AD) group for Foundry access control</td></tr>
+  <tr><td>wear_percentage</td><td>Float (0-100)</td><td>Component</td><td>% worn vs. OEM rated lifespan (hours or cycles)</td></tr>
+  <tr><td>commerce_sku</td><td>String</td><td>Part, NBO_Recommendation</td><td>Direct link to Commerce Platform product catalog</td></tr>
+  <tr><td>telemetry_domain</td><td>Enum</td><td>Component, Alert, TelemetryEvent, NBO, NBA</td><td>ENGINE / HYDRAULICS / FUEL_EMISSIONS / TRANSMISSION / UNDERCARRIAGE / ELECTRICAL / STRUCTURAL / VIBRATION / FLUID / PRODUCTIVITY / LOCATION / OTA_ECM</td></tr>
+</table>
+
+<!-- SECTION 5 — ACTION TYPES -->
+<h1>5. Action Type Definitions</h1>
+<div class="section-intro">Action Types define operations that can be performed on objects — either by users via the portal or triggered automatically by the NBO/NBA engine.</div>
+
+<table>
+  <tr><th>Action Type</th><th>On Object</th><th>Triggered By</th><th>What It Does</th></tr>
+  <tr><td><span class="badge act">RAISE_ALERT</span></td><td>Machine / Component</td><td>Telemetry threshold breach</td><td>Creates new Alert object, sets severity, triggers notification pipeline</td></tr>
+  <tr><td><span class="badge act">CREATE_WORKORDER</span></td><td>Alert</td><td>User or NBA engine</td><td>Creates WorkOrder linked to Alert, assigns to dealer, sets status = OPEN</td></tr>
+  <tr><td><span class="badge act">CLOSE_WORKORDER</span></td><td>WorkOrder</td><td>Dealer confirmation webhook</td><td>Sets status = COMPLETED, resets Component wear %, triggers model retraining</td></tr>
+  <tr><td><span class="badge act">GENERATE_NBO</span></td><td>Machine</td><td>Foundry AIP pipeline (daily)</td><td>Scores components, ranks parts, writes NBO_Recommendation objects</td></tr>
+  <tr><td><span class="badge act">GENERATE_NBA</span></td><td>Machine</td><td>Foundry AIP pipeline (real-time + daily)</td><td>Scores alerts + usage patterns, writes NBA_Recommendation objects</td></tr>
+  <tr><td><span class="badge act">ORDER_PARTS</span></td><td>NBO_Recommendation</td><td>Customer via portal → Commerce Platform</td><td>Redirects to Commerce Platform cart, updates NBO status = ORDERED on webhook</td></tr>
+  <tr><td><span class="badge act">BOOK_SERVICE</span></td><td>NBA_Recommendation</td><td>Customer via portal</td><td>Deep links to dealer scheduling, creates WorkOrder on confirmation</td></tr>
+  <tr><td><span class="badge act">DISMISS_RECOMMENDATION</span></td><td>NBO / NBA</td><td>Customer or Fleet Manager</td><td>Sets status = DISMISSED, feeds back into suppression logic</td></tr>
+  <tr><td><span class="badge act">SEND_NOTIFICATION</span></td><td>Alert / NBA</td><td>Severity = CRITICAL auto-trigger</td><td>Pushes SMS/email to operator, fleet manager, and dealer</td></tr>
+  <tr><td><span class="badge act">RESET_COMPONENT_WEAR</span></td><td>Component</td><td>WorkOrder CLOSE_WORKORDER</td><td>Resets wear_percentage and last_replaced_date after part replacement</td></tr>
+  <tr><td><span class="badge act">RETRAIN_NBO_MODEL</span></td><td>NBO Model</td><td>ORDER_PARTS webhook (weekly batch)</td><td>Incorporates new purchase data into propensity model</td></tr>
+  <tr><td><span class="badge act">RETRAIN_NBA_MODEL</span></td><td>NBA Model</td><td>CLOSE_WORKORDER (weekly batch)</td><td>Incorporates service outcomes into failure prediction model</td></tr>
+</table>
+
+<!-- SECTION 6 — IAM -->
+<h1>6. IAM — Object-Level Access Control</h1>
+<div class="section-intro">Palantir Foundry enforces row-level security via Data Markings. Each object is tagged with a marking that restricts visibility to authorized IAM roles only.</div>
+
+<table>
+  <tr><th>Object Type</th><th>Marking Applied</th><th>Customer</th><th>Dealer</th><th>OEM Internal</th><th>Technician</th><th>Fleet Manager</th></tr>
+  <tr><td>Machine</td><td>customer_id marking</td><td>Own machines ✓</td><td>Dealer network ✓</td><td>All ✓</td><td>Assigned only ✓</td><td>Own fleet ✓</td></tr>
+  <tr><td>Component</td><td>customer_id marking</td><td>Own machines ✓</td><td>Dealer network ✓</td><td>All ✓</td><td>Assigned only ✓</td><td>Own fleet ✓</td></tr>
+  <tr><td>Alert</td><td>customer_id + severity</td><td>Own machines ✓</td><td>Dealer network ✓</td><td>All ✓</td><td>Assigned work orders ✓</td><td>Own fleet ✓</td></tr>
+  <tr><td>WorkOrder</td><td>dealer_id + customer_id</td><td>Own machines ✓</td><td>Own work orders ✓</td><td>All ✓</td><td>Assigned ✓</td><td>Own fleet ✓</td></tr>
+  <tr><td>Customer</td><td>customer_id</td><td>Own record ✓</td><td>Own customers ✓</td><td>All ✓</td><td>✗</td><td>Own record ✓</td></tr>
+  <tr><td>NBO_Recommendation</td><td>customer_id</td><td>Own machines ✓</td><td>Dealer network ✓</td><td>All ✓</td><td>✗</td><td>Own fleet ✓</td></tr>
+  <tr><td>NBA_Recommendation</td><td>customer_id</td><td>Own machines ✓</td><td>Dealer network ✓</td><td>All ✓</td><td>Assigned ✓</td><td>Own fleet ✓</td></tr>
+  <tr><td>Operator</td><td>customer_id</td><td>✗</td><td>✗</td><td>All ✓</td><td>✗</td><td>Anonymized ✓</td></tr>
+  <tr><td>TelemetryEvent</td><td>customer_id</td><td>Own machines ✓</td><td>Dealer network ✓</td><td>All ✓</td><td>✗</td><td>Own fleet ✓</td></tr>
+  <tr><td>Part</td><td>None (global)</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+</table>
+
+<br><br><hr>
+<p style="text-align:center;color:#999;font-size:11px;">Palantir Foundry Ontology — Machine Telemetry Platform &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FinOps & Cost Architecture — Machine Telemetry Platform</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 40px; color: #222; background: #fff; }
+  h1 { color: #1a1a2e; font-size: 22px; border-bottom: 3px solid #d4a017; padding-bottom: 8px; margin-top: 40px; }
+  h2 { color: #457b9d; font-size: 15px; margin: 6px 0 20px 0; }
+  h3 { color: #1a1a2e; font-size: 13px; margin: 18px 0 8px 0; font-weight: bold; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 60px 0 40px 0; }
+  .cover h1 { border: none; font-size: 28px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+  th { background: #1a1a2e; color: white; padding: 8px 12px; text-align: left; }
+  td { border: 1px solid #ddd; padding: 7px 12px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .note { background: #fffbe6; border-left: 4px solid #f4c542; padding: 10px 14px; margin: 16px 0; font-size: 12px; }
+  .cost-box { background: #1a1a2e; color: white; border-radius: 10px; padding: 20px 24px; margin: 16px 0; }
+  .cost-box h3 { color: #d4a017; margin: 0 0 10px 0; }
+  .cost-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 6px 0; font-size: 12px; }
+  .cost-total { display: flex; justify-content: space-between; padding: 8px 0 0 0; font-weight: bold; font-size: 14px; color: #d4a017; }
+  .phase-header { background: #f0f4f8; padding: 10px 16px; border-radius: 6px; font-weight: bold; margin: 20px 0 8px 0; color: #1a1a2e; font-size: 13px; }
+  .lever { background: #eef8f5; border-left: 4px solid #2a9d8f; padding: 10px 14px; margin: 8px 0; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>FinOps & Cost Architecture</h1>
+  <p style="font-size:16px;color:#457b9d;">Machine Telemetry Platform — Cost Model by Phase & Optimization Levers</p>
+  <p style="color:#999;font-size:11px;">Prepared by Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</div>
+
+<div class="note">
+  <strong>Note on estimates:</strong> Palantir Foundry is sold via enterprise contract — exact pricing is NDA-bound and negotiated. The estimates below represent order-of-magnitude ranges based on publicly available Foundry pricing signals and comparable platform costs. AWS costs are based on standard on-demand pricing and can be validated against actual usage.
+</div>
+
+<!-- COST COMPONENTS -->
+<h1>1. Cost Components by Platform</h1>
+
+<h3>Palantir Foundry (Largest Cost Driver)</h3>
+<table>
+  <tr><th>Component</th><th>Pricing Model</th><th>Key Cost Driver</th><th>Optimization Lever</th></tr>
+  <tr><td>Platform License</td><td>Annual enterprise contract — per-tenant flat fee + usage tiers</td><td>Number of Foundry users (named licenses), data volume stored, compute hours consumed</td><td>Minimize named users — use Foundry Slate/Workshop for business users instead of full Foundry seats</td></tr>
+  <tr><td>Dataset Storage</td><td>Typically per-TB per month</td><td>Bronze raw data is highest volume — 12 domains × continuous streaming</td><td>Bronze retention policy (90 days), data tiering, compression</td></tr>
+  <tr><td>Pipeline Compute</td><td>Compute hours consumed by transforms</td><td>Silver→Gold hourly transforms, ML model training jobs</td><td>Right-size compute profiles per transform, avoid over-provisioning large PySpark clusters for small transforms</td></tr>
+  <tr><td>Foundry AIP (ML)</td><td>Additional module — per model/deployment</td><td>Number of deployed ML models × inference volume</td><td>Phase 3 only. Don't deploy AIP until Year 3 when data volume justifies it.</td></tr>
+  <tr><td>Professional Services</td><td>Time & materials — typically $250–400/hr</td><td>Onboarding, training, custom connector development</td><td>Build internal Foundry expertise by Year 2 to reduce PS dependency</td></tr>
+</table>
+
+<h3>AWS (Supporting Infrastructure)</h3>
+<table>
+  <tr><th>Service</th><th>Usage Pattern</th><th>Estimated Monthly Cost</th><th>Optimization</th></tr>
+  <tr><td>Amazon MSK (Kafka)</td><td>12 domains, ~10k events/min peak. 3 brokers, m5.xlarge.</td><td>$1,200 – $2,000</td><td>Right-size broker instance type. Use tiered storage for long retention instead of broker disk.</td></tr>
+  <tr><td>API Gateway (REST)</td><td>~500k API calls/day across all consumers</td><td>$200 – $500</td><td>Cache responses at Gateway level for read-heavy endpoints. Use HTTP API type (cheaper than REST API type).</td></tr>
+  <tr><td>ElastiCache (Redis)</td><td>r6g.large, 2 nodes. Health scores + NBO cache (TTL 5–15 min)</td><td>$300 – $600</td><td>Monitor eviction rate. Right-size based on actual cache hit ratio (target &gt;90%).</td></tr>
+  <tr><td>Lambda (webhook receiver, pricing calls)</td><td>~30k invocations/day (order webhooks + circuit breaker)</td><td>&lt; $50</td><td>Already minimal — Lambda pricing is negligible at this scale.</td></tr>
+  <tr><td>CloudWatch / X-Ray</td><td>Custom metrics, logs, traces</td><td>$200 – $400</td><td>Set log retention to 90 days. Use metric filters instead of logging raw payloads.</td></tr>
+  <tr><td>Secrets Manager</td><td>~15 secrets, ~100k API calls/month</td><td>$10 – $20</td><td>Negligible.</td></tr>
+  <tr><td>WAF</td><td>API Gateway WAF rules</td><td>$100 – $200</td><td>Standard — don't optimize this. Security is non-negotiable.</td></tr>
+  <tr><td><strong>AWS Total (est.)</strong></td><td></td><td><strong>$2,100 – $3,800/month</strong></td><td></td></tr>
+</table>
+
+<!-- COST BY PHASE -->
+<div class="page-break"></div>
+<h1>2. Cost Estimates by Phase</h1>
+
+<div class="phase-header">Phase 1 — Year 1 (Foundation + First Signal)</div>
+<div class="cost-box">
+  <h3>Year 1 Estimated Annual Cost</h3>
+  <div class="cost-row"><span>Palantir Foundry — base platform + Bronze/Silver (2 domains)</span><span>$400k – $700k</span></div>
+  <div class="cost-row"><span>Palantir Professional Services (onboarding + training)</span><span>$150k – $300k</span></div>
+  <div class="cost-row"><span>Amazon MSK (Kafka)</span><span>$18k – $24k</span></div>
+  <div class="cost-row"><span>AWS API Gateway + Lambda + CloudWatch</span><span>$5k – $10k</span></div>
+  <div class="cost-row"><span>Confluent Schema Registry (if external)</span><span>$20k – $40k</span></div>
+  <div class="cost-row"><span>Internal headcount — Foundry training + Data Engineering (2 FTE incremental)</span><span>$300k – $400k</span></div>
+  <div class="cost-total"><span>Year 1 Total (est.)</span><span>$900k – $1.5M</span></div>
+</div>
+
+<div class="note">Year 1 is the highest relative cost vs. value delivered — this is the investment phase. ROI is measured in dealer alert response time improvement and unplanned downtime reduction, not parts revenue (NBO not live yet).</div>
+
+<div class="phase-header">Phase 2 — Year 2 (Platform Expansion)</div>
+<div class="cost-box">
+  <h3>Year 2 Estimated Annual Cost</h3>
+  <div class="cost-row"><span>Palantir Foundry — expanded to all 12 domains, Gold layer, Ontology, basic NBO</span><span>$600k – $1.0M</span></div>
+  <div class="cost-row"><span>Palantir Professional Services (reduced — internal team trained)</span><span>$50k – $100k</span></div>
+  <div class="cost-row"><span>AWS infrastructure (MSK + API Gateway + Redis + CloudWatch)</span><span>$50k – $70k</span></div>
+  <div class="cost-row"><span>Datadog / observability tooling</span><span>$40k – $80k</span></div>
+  <div class="cost-row"><span>Internal headcount — stable team (no incremental hire needed)</span><span>$0 incremental</span></div>
+  <div class="cost-total"><span>Year 2 Total (est.)</span><span>$740k – $1.25M</span></div>
+</div>
+
+<div class="phase-header">Phase 3 — Year 3 (Intelligence Layer)</div>
+<div class="cost-box">
+  <h3>Year 3 Estimated Annual Cost</h3>
+  <div class="cost-row"><span>Palantir Foundry — AIP module (ML), full Ontology, streaming path</span><span>$800k – $1.3M</span></div>
+  <div class="cost-row"><span>AWS infrastructure (expanded — streaming compute, larger Redis)</span><span>$70k – $100k</span></div>
+  <div class="cost-row"><span>Datadog / observability (expanded with ML model monitoring)</span><span>$60k – $100k</span></div>
+  <div class="cost-row"><span>Commerce Platform integration (if the OEM doesn't already have license)</span><span>$100k – $200k</span></div>
+  <div class="cost-row"><span>Legacy system decommission (one-time savings offset)</span><span>($100k – $300k savings)</span></div>
+  <div class="cost-total"><span>Year 3 Total (est.)</span><span>$930k – $1.5M (net of legacy savings)</span></div>
+</div>
+
+<!-- ROI -->
+<h1>3. ROI Framework</h1>
+<h2>How to justify platform investment to a CFO or Board</h2>
+
+<table>
+  <tr><th>Value Driver</th><th>Measurement</th><th>Conservative Estimate</th><th>When Realized</th></tr>
+  <tr><td><strong>Unplanned downtime reduction</strong></td><td>Hours of unplanned downtime prevented × machine day rate ($1,500–$5,000/hr for heavy equipment)</td><td>Even 100 prevented downtime-hours/year at $2,000/hr = $200k/year</td><td>Year 1 (alerting live)</td></tr>
+  <tr><td><strong>Parts revenue from NBO</strong></td><td>NBO conversion rate × average order value × addressable machine fleet</td><td>1,000 machines × 8% conversion × $500 avg order × 4 rec cycles/year = $1.6M incremental parts revenue</td><td>Year 2–3</td></tr>
+  <tr><td><strong>Service labor efficiency</strong></td><td>Dealer technician time saved via NBA pre-diagnosis (NBA provides fault context before technician arrives)</td><td>30 min/service call saved × $150/hr tech rate × 5,000 service calls/year = $375k/year</td><td>Year 2</td></tr>
+  <tr><td><strong>Legacy system decommission</strong></td><td>On-prem infrastructure, licensing, and maintenance costs eliminated</td><td>$100k – $300k/year savings starting Year 3</td><td>Year 3</td></tr>
+  <tr><td><strong>Warranty claim reduction</strong></td><td>Proactive maintenance reduces warranty claims from preventable failures</td><td>Difficult to quantify precisely — track % reduction in warranty claims for instrumented machines vs. uninstrumented cohort</td><td>Year 2–3</td></tr>
+  <tr><td><strong>Total 3-year value (conservative)</strong></td><td></td><td><strong>$3.5M – $7M</strong> against $2.6M – $4.25M platform investment</td><td></td></tr>
+</table>
+
+<div class="note">
+  <strong>ROI narrative:</strong> "The platform investment pays back primarily through two levers: unplanned downtime reduction (Year 1 benefit, measurable immediately) and NBO-driven parts revenue lift (Year 2-3 benefit). We deliberately designed the phasing so that Year 1 delivers a measurable ROI signal — dealer alert response time improvement — before the larger AI/ML investment in Year 3. That sequencing is important for sustained executive sponsorship."
+</div>
+
+<!-- OPTIMIZATION LEVERS -->
+<h1>4. FinOps Optimization Levers</h1>
+
+<div class="lever"><strong>Bronze Data Retention Policy</strong> — Raw Kafka events in Bronze are the largest data volume. Retain for 90 days only. After 90 days, Silver and Gold datasets are the system of record. Archive to S3 Glacier ($0.004/GB/month) for regulatory compliance if needed. This alone can reduce Foundry storage costs 40–60%.</div>
+
+<div class="lever"><strong>Compute Right-Sizing</strong> — Not all pipeline transforms need large Spark clusters. Bronze→Silver transforms for low-volume domains (Vibration, Acoustic) can run on small Foundry compute profiles. Reserve large compute for Silver→Gold aggregations and ML training. Review compute profile assignments quarterly.</div>
+
+<div class="lever"><strong>Minimize Full Foundry Seats</strong> — Foundry named user licenses are expensive. Data engineers and data scientists need full seats. Business analysts and dealers do NOT — they use Foundry Contour (read-only dashboards) or Customer Portal (application layer). Audit user types annually and downgrade where full seats are unused.</div>
+
+<div class="lever"><strong>Kafka MSK Tiered Storage</strong> — Instead of retaining 7 days of Kafka events on expensive broker disk, enable MSK Tiered Storage. Older messages moved to S3 at $0.023/GB vs. EBS disk at $0.10/GB. 4× storage cost reduction for Kafka long retention.</div>
+
+<div class="lever"><strong>API Gateway Caching</strong> — Enable API Gateway response cache for GET /machines/{serial} with 5-minute TTL (aligns with Redis TTL). Reduces Foundry Ontology query volume by ~70% for dashboard refresh patterns (most Portal users refresh the same machine view repeatedly).</div>
+
+<div class="lever"><strong>Pipeline Scheduling Optimization</strong> — Not all Silver→Gold transforms need to run hourly. Non-critical domains (Vibration, Acoustic, Structural) can run every 4 hours with no business impact. Only Engine, DPF/DEF, Hydraulics, Electrical need hourly Gold refresh. Reducing compute schedule for 7 of 12 domains saves ~35% on pipeline compute.</div>
+
+<div class="lever"><strong>ML Training Cadence</strong> — Weekly retraining is sufficient for NBO propensity models (machine behavior patterns don't change faster than weekly). Avoid over-training (daily batch) — this adds compute cost with diminishing accuracy improvement.</div>
+
+<!-- COST GOVERNANCE -->
+<h1>5. Cost Governance Model</h1>
+
+<table>
+  <tr><th>Practice</th><th>Cadence</th><th>Owner</th></tr>
+  <tr><td>Foundry usage review — datasets, users, compute profiles</td><td>Monthly</td><td>Platform Engineering lead + FinOps</td></tr>
+  <tr><td>AWS cost anomaly alert (&gt;30% spike vs. 7-day avg)</td><td>Automated (CloudWatch)</td><td>FinOps team — P4 alert</td></tr>
+  <tr><td>Bronze retention audit — confirm datasets beyond 90 days are archived</td><td>Quarterly</td><td>Data Engineering</td></tr>
+  <tr><td>Foundry named user audit — right-size license types</td><td>Annual (before contract renewal)</td><td>Platform Engineering + IT</td></tr>
+  <tr><td>ROI report — platform value vs. investment by phase</td><td>Quarterly</td><td>Product + Architecture (presented to CIO/CFO)</td></tr>
+  <tr><td>Foundry contract renegotiation — use usage data to negotiate from position of evidence</td><td>Annual (60 days before renewal)</td><td>Architecture lead + Procurement</td></tr>
+</table>
+
+<br><br><hr>
+<p style="text-align:center;color:#999;font-size:11px;">FinOps & Cost Architecture — Machine Telemetry Platform &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</body>
+</html>

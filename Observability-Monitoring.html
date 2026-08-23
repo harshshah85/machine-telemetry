@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Observability & Monitoring — Machine Telemetry Platform</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 40px; color: #222; background: #fff; }
+  h1 { color: #1a1a2e; font-size: 22px; border-bottom: 3px solid #2a9d8f; padding-bottom: 8px; margin-top: 40px; }
+  h2 { color: #457b9d; font-size: 15px; margin: 6px 0 20px 0; }
+  h3 { color: #1a1a2e; font-size: 13px; margin: 18px 0 8px 0; font-weight: bold; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 60px 0 40px 0; }
+  .cover h1 { border: none; font-size: 28px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+  th { background: #1a1a2e; color: white; padding: 8px 12px; text-align: left; }
+  td { border: 1px solid #ddd; padding: 7px 12px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .note { background: #fffbe6; border-left: 4px solid #f4c542; padding: 10px 14px; margin: 16px 0; font-size: 12px; }
+  .slo-box { background: #eef8f5; border: 1px solid #2a9d8f; border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+  .slo-box h3 { color: #2a9d8f; margin: 0 0 8px 0; }
+  .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: bold; color: white; }
+  .b-p1 { background: #e63946; }
+  .b-p2 { background: #f4a261; }
+  .b-p3 { background: #457b9d; }
+  .b-p4 { background: #888; }
+  .pillar { background: #f0f4f8; border-left: 5px solid #457b9d; border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 12px 0; }
+  .pillar h3 { margin: 0 0 6px 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Observability & Monitoring</h1>
+  <p style="font-size:16px;color:#457b9d;">Machine Telemetry Platform — SLOs, Dashboards & Alert Routing</p>
+  <p style="color:#999;font-size:11px;">Prepared by Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</div>
+
+<h1>1. The Three Pillars of Observability</h1>
+
+<div class="pillar">
+  <h3>Metrics — What is happening right now?</h3>
+  <p>Quantitative time-series data: pipeline throughput, API latency, error rates, cache hit ratio, NBO conversion rate. Collected every 60 seconds. Stored in CloudWatch + Datadog. Used for SLO burn-rate alerting and capacity planning.</p>
+</div>
+<div class="pillar" style="border-color:#2a9d8f;">
+  <h3>Logs — Why did something happen?</h3>
+  <p>Structured JSON logs from every component: Magritte connector, pipeline transforms, Machine Domain APIs, NBO Engine, webhook receiver. Centralized in Datadog Log Management or AWS OpenSearch. Retained 90 days. Searched for root cause after an incident.</p>
+</div>
+<div class="pillar" style="border-color:#6d3fa0;">
+  <h3>Traces — Where did a request go and what slowed it down?</h3>
+  <p>Distributed tracing via AWS X-Ray or Datadog APM. Trace ID propagated from Customer Portal → API Gateway → Machine Domain APIs → Foundry Ontology query. Identifies latency hotspots across service boundaries.</p>
+</div>
+
+<h1>2. SLOs — Service Level Objectives by Component</h1>
+<h2>Agreed targets with business stakeholders. SLAs are contractual versions of these with customers.</h2>
+
+<div class="slo-box">
+  <h3>Pipeline SLOs — Data Freshness</h3>
+  <table>
+    <tr><th>Pipeline</th><th>SLO Target</th><th>Measurement</th><th>Alert Threshold</th></tr>
+    <tr><td>Kafka → Bronze (Magritte)</td><td>99.5% of events land in Bronze within 60 seconds of emission</td><td>Kafka consumer lag metric + Foundry dataset last_updated_at</td><td>Alert if lag &gt; 300 events OR freshness &gt; 5 min for any domain</td></tr>
+    <tr><td>Bronze → Silver transform</td><td>99% of Bronze partitions processed within 20 minutes of arrival</td><td>Pipeline job success rate + output dataset row count vs. input</td><td>Alert if Silver last_updated_at &gt; 30 min old</td></tr>
+    <tr><td>Silver → Gold transform</td><td>99% of Silver input processed within 90 minutes (hourly schedule)</td><td>Gold dataset freshness per domain</td><td>Alert if Gold last_updated_at &gt; 105 minutes for Engine/DPF (critical domains); &gt; 2 hours for all other domains</td></tr>
+    <tr><td>MDM sync (Bronze reference)</td><td>MDM Bronze datasets updated within 2 hours of daily sync start</td><td>Magritte MDM connector last_run_at</td><td>Alert if MDM sync not completed by 8 AM local time</td></tr>
+    <tr><td>Streaming path (Engine/DPF → Ontology)</td><td>99.9% of critical fault events update Ontology within 90 seconds</td><td>Event emit timestamp → Ontology property updated_at delta</td><td>Alert if p99 latency &gt; 3 minutes</td></tr>
+  </table>
+</div>
+
+<div class="slo-box">
+  <h3>API SLOs — Availability & Latency</h3>
+  <table>
+    <tr><th>API / Endpoint</th><th>Availability SLO</th><th>Latency SLO</th><th>Error Budget (30 days)</th></tr>
+    <tr><td>Machine Domain APIs — GET /machines/{serial}</td><td>99.9%</td><td>p50 &lt; 150ms, p95 &lt; 400ms, p99 &lt; 800ms</td><td>43.2 minutes downtime/month</td></tr>
+    <tr><td>Machine Domain APIs — GET /machines/{serial}/alerts</td><td>99.9%</td><td>p50 &lt; 200ms, p95 &lt; 500ms</td><td>43.2 minutes downtime/month</td></tr>
+    <tr><td>NBO Engine — recommendation generation</td><td>99.5%</td><td>p95 &lt; 3 seconds (includes live pricing call to Commerce Platform)</td><td>3.6 hours downtime/month</td></tr>
+    <tr><td>Customer Portal (frontend)</td><td>99.9%</td><td>Time to interactive &lt; 2 seconds on 4G connection</td><td>43.2 minutes downtime/month</td></tr>
+    <tr><td>Webhook receiver (Commerce Platform → Foundry)</td><td>99.5%</td><td>Webhook acknowledged within 5 seconds (async processing)</td><td>3.6 hours/month</td></tr>
+  </table>
+</div>
+
+<div class="slo-box">
+  <h3>NBO Quality SLOs — Business Outcomes</h3>
+  <table>
+    <tr><th>Metric</th><th>SLO Target</th><th>Measurement Cadence</th></tr>
+    <tr><td>NBO recommendation conversion rate</td><td>&gt; 8% within 30 days of display</td><td>Weekly — Foundry Contour dashboard</td></tr>
+    <tr><td>Suppression rule effectiveness</td><td>0% re-recommendation within 30 days of purchase</td><td>Daily — automated check on nbo_outcomes dataset</td></tr>
+    <tr><td>Stale recommendation rate</td><td>&lt; 1% of recommendations shown are &gt; 24 hours old</td><td>Hourly — NBO generation timestamp vs. display time</td></tr>
+    <tr><td>Urgency score accuracy (HIGH urgency → order within 14 days)</td><td>&gt; 35% conversion for HIGH urgency</td><td>Monthly — cohort analysis on Foundry</td></tr>
+  </table>
+</div>
+
+<!-- ALERT ROUTING -->
+<div class="page-break"></div>
+<h1>3. Alert Routing & On-Call Design</h1>
+
+<table>
+  <tr><th>Alert</th><th>Severity</th><th>Route To</th><th>Response Time</th></tr>
+  <tr><td>Engine/DPF streaming path latency &gt; 3 min (CRITICAL domain)</td><td><span class="badge b-p1">P1</span></td><td>Platform Engineering on-call — PagerDuty immediate page</td><td>15 minutes</td></tr>
+  <tr><td>Machine Domain API error rate &gt; 1% for 5 min</td><td><span class="badge b-p1">P1</span></td><td>Platform Engineering on-call</td><td>15 minutes</td></tr>
+  <tr><td>Customer Portal availability &lt; 99.5%</td><td><span class="badge b-p1">P1</span></td><td>Platform Engineering + Product on-call</td><td>15 minutes</td></tr>
+  <tr><td>Kafka consumer lag &gt; 300 events for any domain</td><td><span class="badge b-p2">P2</span></td><td>Data Engineering on-call — PagerDuty</td><td>30 minutes</td></tr>
+  <tr><td>Bronze→Silver pipeline failure (any domain)</td><td><span class="badge b-p2">P2</span></td><td>Data Engineering on-call</td><td>30 minutes</td></tr>
+  <tr><td>Silver→Gold pipeline failure (Engine/DPF)</td><td><span class="badge b-p2">P2</span></td><td>Data Engineering on-call</td><td>30 minutes</td></tr>
+  <tr><td>Silver→Gold pipeline failure (non-critical domain)</td><td><span class="badge b-p3">P3</span></td><td>Data Engineering Slack channel — next business day</td><td>4 hours</td></tr>
+  <tr><td>MDM sync not completed by 8 AM</td><td><span class="badge b-p3">P3</span></td><td>Data Engineering Slack channel</td><td>2 hours</td></tr>
+  <tr><td>Commerce Platform webhook dead letter (5 failures)</td><td><span class="badge b-p2">P2</span></td><td>Integration team + Data Engineering</td><td>30 minutes</td></tr>
+  <tr><td>NBO conversion rate drops &gt; 20% week-over-week</td><td><span class="badge b-p3">P3</span></td><td>Data Science team Slack — business hours</td><td>Next business day</td></tr>
+  <tr><td>Foundry compute cost spike &gt; 30% vs. 7-day average</td><td><span class="badge b-p4">P4</span></td><td>FinOps team email</td><td>Next business day</td></tr>
+  <tr><td>Security anomaly: bulk machine read &gt; 100 serial/min from one client_id</td><td><span class="badge b-p1">P1</span></td><td>Security team + Platform Engineering — immediate</td><td>15 minutes</td></tr>
+</table>
+
+<!-- DASHBOARDS -->
+<h1>4. Dashboard Design — What Each Team Sees</h1>
+
+<h3>Platform Engineering Dashboard (Operational Health)</h3>
+<table>
+  <tr><th>Panel</th><th>Metric</th><th>Visualization</th></tr>
+  <tr><td>API Health</td><td>Machine Domain API p50/p95/p99 latency, error rate, request volume — last 1hr, 24hr, 7day</td><td>Time-series line chart with SLO threshold overlay</td></tr>
+  <tr><td>SLO Burn Rate</td><td>28-day rolling SLO compliance % per service. Error budget remaining.</td><td>Gauge per service — green &gt;80% budget, amber 20-80%, red &lt;20%</td></tr>
+  <tr><td>Redis Cache</td><td>Hit ratio, memory usage, eviction rate, p99 read latency</td><td>Single-stat + time series</td></tr>
+  <tr><td>Active Alerts</td><td>Open P1/P2 alerts, MTTR trend</td><td>Alert list + 30-day MTTR line chart</td></tr>
+</table>
+
+<h3>Data Engineering Dashboard (Pipeline Health)</h3>
+<table>
+  <tr><th>Panel</th><th>Metric</th><th>Visualization</th></tr>
+  <tr><td>Dataset Freshness Heatmap</td><td>Last updated time for every Silver and Gold dataset. Color: green &lt;1hr, amber 1-2hr, red &gt;2hr</td><td>Grid heatmap — domains × layer</td></tr>
+  <tr><td>Pipeline Success Rate</td><td>% of scheduled pipeline runs that completed successfully — last 24hrs by domain</td><td>Bar chart per domain</td></tr>
+  <tr><td>Kafka Lag</td><td>Consumer lag per topic (engine, hydraulics, DPF, etc.) — last 1hr</td><td>Stacked area chart</td></tr>
+  <tr><td>Data Quality Checks</td><td>Pass/fail rate for Bronze→Silver Checks by domain and check type (null rate, range, schema drift)</td><td>Table with pass % per check — red cells for &lt;95%</td></tr>
+  <tr><td>Quarantine Rate</td><td>% of Kafka events quarantined due to unresolved MDM serial # — by domain</td><td>Time-series — spike = MDM sync issue or new machine type</td></tr>
+</table>
+
+<h3>Data Science Dashboard (NBO Quality)</h3>
+<table>
+  <tr><th>Panel</th><th>Metric</th><th>Visualization</th></tr>
+  <tr><td>NBO Conversion Funnel</td><td>Recommendations generated → displayed → clicked → ordered (30-day cohort)</td><td>Funnel chart</td></tr>
+  <tr><td>Conversion Rate by Urgency</td><td>Order conversion % split by CRITICAL / HIGH / MEDIUM / ROUTINE</td><td>Grouped bar chart</td></tr>
+  <tr><td>Model Drift</td><td>Weekly propensity score distribution shift vs. previous week (KS statistic)</td><td>Histogram overlay — alert if KS &gt; 0.2</td></tr>
+  <tr><td>Suppression Rule Impact</td><td>% of eligible recommendations suppressed by rule type</td><td>Pie chart — identifies if any rule is over-suppressing</td></tr>
+  <tr><td>Revenue Attribution</td><td>Order revenue from NBO-sourced orders vs. organic — rolling 30 days</td><td>Stacked area chart</td></tr>
+</table>
+
+<h3>Business / Executive Dashboard (Foundry Contour)</h3>
+<table>
+  <tr><th>Panel</th><th>Description</th></tr>
+  <tr><td>Fleet Health Score Distribution</td><td>% of machines in CRITICAL / HIGH / MEDIUM / HEALTHY status across customer fleet. Trend over 90 days.</td></tr>
+  <tr><td>Unplanned Downtime Reduction</td><td>Estimated downtime prevented (hours) from proactive alerts vs. baseline period. Dollar value at standard machine downtime rate.</td></tr>
+  <tr><td>NBO Parts Revenue</td><td>Parts revenue attributable to NBO recommendations. Split by domain (Engine, DPF, Hydraulics, etc.).</td></tr>
+  <tr><td>Alert Response Time</td><td>Average time from alert generation to work order creation by dealer. By dealer territory.</td></tr>
+  <tr><td>Platform Coverage</td><td>% of machines in MDM that are actively streaming telemetry. Coverage gap = machines not yet connected.</td></tr>
+</table>
+
+<!-- INCIDENT MANAGEMENT -->
+<h1>5. Incident Management Process</h1>
+
+<table>
+  <tr><th>Phase</th><th>Action</th><th>Owner</th><th>Tooling</th></tr>
+  <tr><td><strong>Detect</strong></td><td>Automated alert fires via PagerDuty. On-call engineer acknowledged within 15 min (P1) or 30 min (P2).</td><td>On-call rotation</td><td>PagerDuty + Datadog</td></tr>
+  <tr><td><strong>Triage</strong></td><td>Open incident Slack channel (#incident-YYYY-MM-DD-nnn). Assign incident commander. Assess blast radius (which customers affected, which domains).</td><td>Incident commander</td><td>Slack + Datadog dashboard</td></tr>
+  <tr><td><strong>Diagnose</strong></td><td>Check metrics dashboard for anomaly start time. Pull correlated logs in Datadog. Trace specific failing requests via X-Ray.</td><td>Platform Engineer</td><td>Datadog + X-Ray</td></tr>
+  <tr><td><strong>Mitigate</strong></td><td>Apply fastest available fix (rollback deployment, increase pipeline compute, clear Redis cache, re-run failed pipeline job).</td><td>On-call engineer</td><td>Foundry admin + AWS console</td></tr>
+  <tr><td><strong>Resolve</strong></td><td>Confirm SLO metrics return to green. Notify stakeholders. Close incident channel.</td><td>Incident commander</td><td>PagerDuty resolve + Slack</td></tr>
+  <tr><td><strong>Post-mortem</strong></td><td>Blameless post-mortem within 48 hours for all P1s. 5-whys root cause. Action items tracked in Jira with owners and deadlines.</td><td>Incident commander + team</td><td>Confluence + Jira</td></tr>
+</table>
+
+<div class="note">
+  <strong>Blameless culture note:</strong> Post-mortems focus on system and process failures, not individual mistakes. The goal is to make the system more resilient — not to assign blame. This principle is non-negotiable and modeled by leadership.
+</div>
+
+<br><br><hr>
+<p style="text-align:center;color:#999;font-size:11px;">Observability & Monitoring — Machine Telemetry Platform &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</body>
+</html>

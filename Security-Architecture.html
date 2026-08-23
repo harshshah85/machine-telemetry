@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Security Architecture — Machine Telemetry Platform</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 40px; color: #222; background: #fff; }
+  h1 { color: #1a1a2e; font-size: 22px; border-bottom: 3px solid #e63946; padding-bottom: 8px; margin-top: 40px; }
+  h2 { color: #457b9d; font-size: 15px; margin: 6px 0 20px 0; }
+  h3 { color: #1a1a2e; font-size: 13px; margin: 18px 0 8px 0; font-weight: bold; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 60px 0 40px 0; }
+  .cover h1 { border: none; font-size: 28px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+  th { background: #1a1a2e; color: white; padding: 8px 12px; text-align: left; }
+  td { border: 1px solid #ddd; padding: 7px 12px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .note { background: #fffbe6; border-left: 4px solid #f4c542; padding: 10px 14px; margin: 16px 0; font-size: 12px; }
+  .threat { background: #fff0f0; border-left: 4px solid #e63946; padding: 10px 14px; margin: 10px 0; font-size: 12px; }
+  .control { background: #f0f8f0; border-left: 4px solid #2a9d8f; padding: 10px 14px; margin: 10px 0; font-size: 12px; }
+  .layer { background: #f0f4f8; border-radius: 8px; padding: 18px 20px; margin: 16px 0; border-left: 5px solid #457b9d; }
+  .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: bold; color: white; margin-right: 4px; }
+  .b-high { background: #e63946; }
+  .b-med { background: #f4a261; }
+  .b-low { background: #2a9d8f; }
+  code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 11px; }
+  .diagram-wrap { overflow-x: auto; margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Security Architecture</h1>
+  <p style="font-size:16px;color:#457b9d;">Machine Telemetry Platform — End-to-End Security Design</p>
+  <p style="color:#999;font-size:11px;">Prepared by Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</div>
+
+<!-- OVERVIEW DIAGRAM -->
+<h1>1. Security Layers Overview</h1>
+<h2>Seven security zones from machine edge to application consumer</h2>
+
+<div class="diagram-wrap">
+<svg width="900" height="520" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="sa" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#555"/>
+    </marker>
+    <filter id="ss"><feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.12"/></filter>
+  </defs>
+
+  <!-- Layer boxes left to right -->
+  <!-- L1: Machine/Edge -->
+  <rect x="10" y="40" width="115" height="440" rx="8" fill="#fdecea" stroke="#e63946" stroke-width="1.5" filter="url(#ss)"/>
+  <text x="67" y="62" fill="#e63946" font-size="10" font-weight="bold" text-anchor="middle">LAYER 1</text>
+  <text x="67" y="76" fill="#e63946" font-size="9" text-anchor="middle">EDGE / MACHINE</text>
+  <rect x="22" y="90" width="91" height="50" rx="5" fill="#e63946"/>
+  <text x="67" y="110" fill="white" font-size="9" font-weight="bold" text-anchor="middle">X.509 Device</text>
+  <text x="67" y="124" fill="white" font-size="9" text-anchor="middle">Certificates</text>
+  <rect x="22" y="152" width="91" height="50" rx="5" fill="#e63946"/>
+  <text x="67" y="172" fill="white" font-size="9" font-weight="bold" text-anchor="middle">HSM Key</text>
+  <text x="67" y="186" fill="white" font-size="9" text-anchor="middle">Storage</text>
+  <rect x="22" y="214" width="91" height="50" rx="5" fill="#e63946"/>
+  <text x="67" y="234" fill="white" font-size="9" font-weight="bold" text-anchor="middle">mTLS to</text>
+  <text x="67" y="248" fill="white" font-size="9" text-anchor="middle">Kafka Broker</text>
+  <rect x="22" y="276" width="91" height="50" rx="5" fill="#e63946"/>
+  <text x="67" y="296" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Edge Buffer</text>
+  <text x="67" y="310" fill="white" font-size="9" text-anchor="middle">Encrypted AES-256</text>
+  <rect x="22" y="338" width="91" height="50" rx="5" fill="#e63946"/>
+  <text x="67" y="358" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Firmware</text>
+  <text x="67" y="372" fill="white" font-size="9" text-anchor="middle">Signed OTA</text>
+
+  <!-- Arrow -->
+  <line x1="125" y1="260" x2="145" y2="260" stroke="#555" stroke-width="1.5" marker-end="url(#sa)"/>
+
+  <!-- L2: Kafka -->
+  <rect x="145" y="40" width="115" height="440" rx="8" fill="#fff3e0" stroke="#f4a261" stroke-width="1.5" filter="url(#ss)"/>
+  <text x="202" y="62" fill="#c96a00" font-size="10" font-weight="bold" text-anchor="middle">LAYER 2</text>
+  <text x="202" y="76" fill="#c96a00" font-size="9" text-anchor="middle">KAFKA BROKER</text>
+  <rect x="157" y="90" width="91" height="50" rx="5" fill="#f4a261"/>
+  <text x="202" y="110" fill="white" font-size="9" font-weight="bold" text-anchor="middle">SASL/SSL</text>
+  <text x="202" y="124" fill="white" font-size="9" text-anchor="middle">Auth</text>
+  <rect x="157" y="152" width="91" height="50" rx="5" fill="#f4a261"/>
+  <text x="202" y="172" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Topic-level</text>
+  <text x="202" y="186" fill="white" font-size="9" text-anchor="middle">ACLs</text>
+  <rect x="157" y="214" width="91" height="50" rx="5" fill="#f4a261"/>
+  <text x="202" y="234" fill="white" font-size="9" font-weight="bold" text-anchor="middle">TLS 1.3</text>
+  <text x="202" y="248" fill="white" font-size="9" text-anchor="middle">In Transit</text>
+  <rect x="157" y="276" width="91" height="50" rx="5" fill="#f4a261"/>
+  <text x="202" y="296" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Schema</text>
+  <text x="202" y="310" fill="white" font-size="9" text-anchor="middle">Registry Auth</text>
+  <rect x="157" y="338" width="91" height="50" rx="5" fill="#f4a261"/>
+  <text x="202" y="358" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Private VPC</text>
+  <text x="202" y="372" fill="white" font-size="9" text-anchor="middle">Endpoint</text>
+
+  <line x1="260" y1="260" x2="280" y2="260" stroke="#555" stroke-width="1.5" marker-end="url(#sa)"/>
+
+  <!-- L3: Foundry -->
+  <rect x="280" y="40" width="115" height="440" rx="8" fill="#eef0f8" stroke="#1a1a2e" stroke-width="1.5" filter="url(#ss)"/>
+  <text x="337" y="62" fill="#1a1a2e" font-size="10" font-weight="bold" text-anchor="middle">LAYER 3</text>
+  <text x="337" y="76" fill="#1a1a2e" font-size="9" text-anchor="middle">PALANTIR FOUNDRY</text>
+  <rect x="292" y="90" width="91" height="50" rx="5" fill="#1a1a2e"/>
+  <text x="337" y="110" fill="white" font-size="9" font-weight="bold" text-anchor="middle">AES-256</text>
+  <text x="337" y="124" fill="white" font-size="9" text-anchor="middle">At Rest</text>
+  <rect x="292" y="152" width="91" height="50" rx="5" fill="#1a1a2e"/>
+  <text x="337" y="172" fill="white" font-size="9" font-weight="bold" text-anchor="middle">IAM Data</text>
+  <text x="337" y="186" fill="white" font-size="9" text-anchor="middle">Markings</text>
+  <rect x="292" y="214" width="91" height="50" rx="5" fill="#1a1a2e"/>
+  <text x="337" y="234" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Row-Level</text>
+  <text x="337" y="248" fill="white" font-size="9" text-anchor="middle">Security</text>
+  <rect x="292" y="276" width="91" height="50" rx="5" fill="#1a1a2e"/>
+  <text x="337" y="296" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Foundry</text>
+  <text x="337" y="310" fill="white" font-size="9" text-anchor="middle">Audit Log</text>
+  <rect x="292" y="338" width="91" height="50" rx="5" fill="#1a1a2e"/>
+  <text x="337" y="358" fill="white" font-size="9" font-weight="bold" text-anchor="middle">PII Column</text>
+  <text x="337" y="372" fill="white" font-size="9" text-anchor="middle">Tokenization</text>
+
+  <line x1="395" y1="260" x2="415" y2="260" stroke="#555" stroke-width="1.5" marker-end="url(#sa)"/>
+
+  <!-- L4: Network -->
+  <rect x="415" y="40" width="115" height="440" rx="8" fill="#e8f2f8" stroke="#457b9d" stroke-width="1.5" filter="url(#ss)"/>
+  <text x="472" y="62" fill="#457b9d" font-size="10" font-weight="bold" text-anchor="middle">LAYER 4</text>
+  <text x="472" y="76" fill="#457b9d" font-size="9" text-anchor="middle">NETWORK</text>
+  <rect x="427" y="90" width="91" height="50" rx="5" fill="#457b9d"/>
+  <text x="472" y="110" fill="white" font-size="9" font-weight="bold" text-anchor="middle">VPC Isolation</text>
+  <text x="472" y="124" fill="white" font-size="9" text-anchor="middle">Private Subnets</text>
+  <rect x="427" y="152" width="91" height="50" rx="5" fill="#457b9d"/>
+  <text x="472" y="172" fill="white" font-size="9" font-weight="bold" text-anchor="middle">WAF at API</text>
+  <text x="472" y="186" fill="white" font-size="9" text-anchor="middle">Gateway</text>
+  <rect x="427" y="214" width="91" height="50" rx="5" fill="#457b9d"/>
+  <text x="472" y="234" fill="white" font-size="9" font-weight="bold" text-anchor="middle">DDoS Shield</text>
+  <text x="472" y="248" fill="white" font-size="9" text-anchor="middle">AWS Shield</text>
+  <rect x="427" y="276" width="91" height="50" rx="5" fill="#457b9d"/>
+  <text x="472" y="296" fill="white" font-size="9" font-weight="bold" text-anchor="middle">PrivateLink</text>
+  <text x="472" y="310" fill="white" font-size="9" text-anchor="middle">Foundry Endpoint</text>
+  <rect x="427" y="338" width="91" height="50" rx="5" fill="#457b9d"/>
+  <text x="472" y="358" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Security</text>
+  <text x="472" y="372" fill="white" font-size="9" text-anchor="middle">Groups / NACLs</text>
+
+  <line x1="530" y1="260" x2="550" y2="260" stroke="#555" stroke-width="1.5" marker-end="url(#sa)"/>
+
+  <!-- L5: API -->
+  <rect x="550" y="40" width="115" height="440" rx="8" fill="#e8f7f4" stroke="#2a9d8f" stroke-width="1.5" filter="url(#ss)"/>
+  <text x="607" y="62" fill="#2a9d8f" font-size="10" font-weight="bold" text-anchor="middle">LAYER 5</text>
+  <text x="607" y="76" fill="#2a9d8f" font-size="9" text-anchor="middle">API GATEWAY</text>
+  <rect x="562" y="90" width="91" height="50" rx="5" fill="#2a9d8f"/>
+  <text x="607" y="110" fill="white" font-size="9" font-weight="bold" text-anchor="middle">OAuth 2.0</text>
+  <text x="607" y="124" fill="white" font-size="9" text-anchor="middle">JWT Validation</text>
+  <rect x="562" y="152" width="91" height="50" rx="5" fill="#2a9d8f"/>
+  <text x="607" y="172" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Rate Limiting</text>
+  <text x="607" y="186" fill="white" font-size="9" text-anchor="middle">per client_id</text>
+  <rect x="562" y="214" width="91" height="50" rx="5" fill="#2a9d8f"/>
+  <text x="607" y="234" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Scope</text>
+  <text x="607" y="248" fill="white" font-size="9" text-anchor="middle">Enforcement</text>
+  <rect x="562" y="276" width="91" height="50" rx="5" fill="#2a9d8f"/>
+  <text x="607" y="296" fill="white" font-size="9" font-weight="bold" text-anchor="middle">mTLS Svc-to-</text>
+  <text x="607" y="310" fill="white" font-size="9" text-anchor="middle">Svc Internal</text>
+  <rect x="562" y="338" width="91" height="50" rx="5" fill="#2a9d8f"/>
+  <text x="607" y="358" fill="white" font-size="9" font-weight="bold" text-anchor="middle">API Access</text>
+  <text x="607" y="372" fill="white" font-size="9" text-anchor="middle">Audit Log</text>
+
+  <line x1="665" y1="260" x2="685" y2="260" stroke="#555" stroke-width="1.5" marker-end="url(#sa)"/>
+
+  <!-- L6: IAM -->
+  <rect x="685" y="40" width="115" height="440" rx="8" fill="#f0eaff" stroke="#6d3fa0" stroke-width="1.5" filter="url(#ss)"/>
+  <text x="742" y="62" fill="#6d3fa0" font-size="10" font-weight="bold" text-anchor="middle">LAYER 6</text>
+  <text x="742" y="76" fill="#6d3fa0" font-size="9" text-anchor="middle">IDENTITY (IAM)</text>
+  <rect x="697" y="90" width="91" height="50" rx="5" fill="#6d3fa0"/>
+  <text x="742" y="110" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Okta / Azure</text>
+  <text x="742" y="124" fill="white" font-size="9" text-anchor="middle">AD OIDC SSO</text>
+  <rect x="697" y="152" width="91" height="50" rx="5" fill="#6d3fa0"/>
+  <text x="742" y="172" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Role → Foundry</text>
+  <text x="742" y="186" fill="white" font-size="9" text-anchor="middle">Group Mapping</text>
+  <rect x="697" y="214" width="91" height="50" rx="5" fill="#6d3fa0"/>
+  <text x="742" y="234" fill="white" font-size="9" font-weight="bold" text-anchor="middle">MFA Enforced</text>
+  <text x="742" y="248" fill="white" font-size="9" text-anchor="middle">All Users</text>
+  <rect x="697" y="276" width="91" height="50" rx="5" fill="#6d3fa0"/>
+  <text x="742" y="296" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Just-in-Time</text>
+  <text x="742" y="310" fill="white" font-size="9" text-anchor="middle">Provisioning</text>
+  <rect x="697" y="338" width="91" height="50" rx="5" fill="#6d3fa0"/>
+  <text x="742" y="358" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Session</text>
+  <text x="742" y="372" fill="white" font-size="9" text-anchor="middle">Token TTL</text>
+
+  <line x1="800" y1="260" x2="820" y2="260" stroke="#555" stroke-width="1.5" marker-end="url(#sa)"/>
+
+  <!-- L7: Compliance -->
+  <rect x="820" y="40" width="70" height="440" rx="8" fill="#f7f7f7" stroke="#888" stroke-width="1.5" filter="url(#ss)"/>
+  <text x="855" y="62" fill="#555" font-size="10" font-weight="bold" text-anchor="middle">L7</text>
+  <text x="855" y="76" fill="#555" font-size="9" text-anchor="middle">COMPLIANCE</text>
+  <rect x="830" y="90" width="50" height="42" rx="5" fill="#888"/>
+  <text x="855" y="108" fill="white" font-size="9" font-weight="bold" text-anchor="middle">SOC 2</text>
+  <text x="855" y="122" fill="white" font-size="9" text-anchor="middle">Type II</text>
+  <rect x="830" y="144" width="50" height="42" rx="5" fill="#888"/>
+  <text x="855" y="162" fill="white" font-size="9" font-weight="bold" text-anchor="middle">GDPR</text>
+  <text x="855" y="176" fill="white" font-size="9" text-anchor="middle">EU Data</text>
+  <rect x="830" y="198" width="50" height="42" rx="5" fill="#888"/>
+  <text x="855" y="216" fill="white" font-size="9" font-weight="bold" text-anchor="middle">CCPA</text>
+  <text x="855" y="230" fill="white" font-size="9" text-anchor="middle">CA</text>
+  <rect x="830" y="252" width="50" height="42" rx="5" fill="#888"/>
+  <text x="855" y="270" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Key</text>
+  <text x="855" y="284" fill="white" font-size="9" text-anchor="middle">Rotation</text>
+  <rect x="830" y="306" width="50" height="42" rx="5" fill="#888"/>
+  <text x="855" y="324" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Pen</text>
+  <text x="855" y="338" fill="white" font-size="9" text-anchor="middle">Testing</text>
+
+  <!-- Bottom labels -->
+  <text x="67" y="498" fill="#e63946" font-size="9" text-anchor="middle">Machine</text>
+  <text x="202" y="498" fill="#c96a00" font-size="9" text-anchor="middle">Streaming</text>
+  <text x="337" y="498" fill="#1a1a2e" font-size="9" text-anchor="middle">Data Platform</text>
+  <text x="472" y="498" fill="#457b9d" font-size="9" text-anchor="middle">Network</text>
+  <text x="607" y="498" fill="#2a9d8f" font-size="9" text-anchor="middle">API</text>
+  <text x="742" y="498" fill="#6d3fa0" font-size="9" text-anchor="middle">Identity</text>
+  <text x="855" y="498" fill="#555" font-size="9" text-anchor="middle">Audit</text>
+</svg>
+</div>
+
+<!-- LAYER 1: EDGE -->
+<div class="page-break"></div>
+<h1>2. Layer 1 — Edge / Machine Security</h1>
+<h2>Securing the first mile: machine CAN bus to Kafka broker</h2>
+
+<div class="layer">
+<h3>Telematics Unit (TU) Security</h3>
+<p>Each machine has a telematics unit that reads from the CAN bus, buffers data locally, and transmits over cellular. The TU is the trust root for machine identity.</p>
+</div>
+
+<table>
+  <tr><th>Control</th><th>Mechanism</th><th>Why</th></tr>
+  <tr><td><strong>Device Identity</strong></td><td>X.509 certificate per telematics unit, signed by the OEM internal PKI. Certificate bound to machine serial number from MDM.</td><td>Ensures only registered the OEM machines can publish to Kafka topics. Prevents rogue device injection.</td></tr>
+  <tr><td><strong>Key Storage</strong></td><td>Hardware Security Module (HSM) or Trusted Platform Module (TPM) on the telematics unit. Private key never leaves hardware.</td><td>Prevents key extraction even if physical device is compromised.</td></tr>
+  <tr><td><strong>Transport</strong></td><td>Mutual TLS (mTLS) from TU to Kafka broker. Both sides present certificates.</td><td>Bidirectional authentication. Prevents man-in-the-middle attacks on cellular network.</td></tr>
+  <tr><td><strong>Edge Buffer Encryption</strong></td><td>AES-256 encryption on local buffer (used when cellular connectivity is lost). Key derived from HSM.</td><td>Data-at-rest protection if device is physically stolen from a job site.</td></tr>
+  <tr><td><strong>Firmware Integrity</strong></td><td>OTA firmware updates signed by the OEM code-signing certificate. TU validates signature before applying.</td><td>Prevents malicious firmware updates from compromising telemetry or using device as attack vector.</td></tr>
+  <tr><td><strong>Store and Forward</strong></td><td>When connectivity drops, TU buffers up to 72 hours of telemetry locally (encrypted). Replays in order when connection restores.</td><td>Data completeness guarantee. No silent data loss during remote site operations.</td></tr>
+</table>
+
+<div class="threat"><strong>Threat:</strong> A stolen telematics unit used to inject false telemetry (e.g., artificially healthy engine readings to suppress maintenance alerts).<br><strong>Control:</strong> Certificate revocation list (CRL) checked at broker. MDM de-registration immediately revokes Kafka ACL for that serial number.</div>
+
+<!-- LAYER 2: KAFKA -->
+<h1>3. Layer 2 — Kafka Broker Security</h1>
+
+<table>
+  <tr><th>Control</th><th>Mechanism</th><th>Detail</th></tr>
+  <tr><td><strong>Authentication</strong></td><td>SASL/SSL — machines use mTLS certificates; internal services (Magritte, pipeline jobs) use SASL/SCRAM-SHA-512</td><td>Different auth mechanisms per client type. Machines present X.509, internal services use rotating SCRAM credentials managed by AWS Secrets Manager.</td></tr>
+  <tr><td><strong>Authorization</strong></td><td>Topic-level ACLs. Each machine certificate can PRODUCE to its domain topics only (e.g., <code>telemetry.engine.*</code>). Magritte can CONSUME only, not produce.</td><td>Least-privilege per client. A compromised machine certificate cannot write to other domains or consume data.</td></tr>
+  <tr><td><strong>Encryption in Transit</strong></td><td>TLS 1.3 for all broker-to-broker and client-to-broker communication</td><td>Forward secrecy. Cipher suites: TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256.</td></tr>
+  <tr><td><strong>Schema Validation</strong></td><td>Confluent Schema Registry enforces Avro/Protobuf schema on produce. Schema Registry itself requires OAuth token to register/evolve schemas.</td><td>Malformed telemetry payloads rejected at broker before reaching Foundry. Schema evolution requires explicit approval.</td></tr>
+  <tr><td><strong>Network Isolation</strong></td><td>Kafka brokers in private VPC subnet. No public internet access. Magritte Connector reaches brokers via AWS PrivateLink.</td><td>Attack surface limited to internal network only.</td></tr>
+  <tr><td><strong>Dead Letter Queue Security</strong></td><td>DLQ topic restricted to ops team ACL only. Messages in DLQ retain original encryption.</td><td>Failed messages not accessible to application consumers. Ops team investigates without exposing raw payload broadly.</td></tr>
+</table>
+
+<!-- LAYER 3: FOUNDRY -->
+<h1>4. Layer 3 — Palantir Foundry Security</h1>
+
+<table>
+  <tr><th>Control</th><th>Mechanism</th><th>Detail</th></tr>
+  <tr><td><strong>Encryption at Rest</strong></td><td>AES-256 for all datasets (Bronze, Silver, Gold). Foundry manages encryption keys. Customer-managed keys (BYOK) available via AWS KMS for highest-sensitivity datasets.</td><td>All telemetry data encrypted at storage layer. BYOK for PII datasets (operator identity, customer fleet data).</td></tr>
+  <tr><td><strong>Data Markings</strong></td><td>Foundry IAM markings applied at dataset and Ontology object level. Enforced by Foundry kernel — cannot be bypassed at query time.</td><td>A dealer user querying Machine objects only ever sees machines in their assigned territory. Marking filters rows before data leaves Foundry.</td></tr>
+  <tr><td><strong>PII Tokenization</strong></td><td>Operator name, GPS coordinates (precise), customer contact data tokenized at Silver layer. Raw values in Bronze accessible only to Data Engineering role.</td><td>Gold and Ontology layers expose tokenized or bucketed values (e.g., GPS geofence zone, not exact coordinates) to application consumers.</td></tr>
+  <tr><td><strong>Foundry Audit Log</strong></td><td>Every dataset read, write, and query logged with user identity, timestamp, and query parameters. Logs retained 13 months. Immutable.</td><td>Full audit trail for compliance. Supports GDPR right-of-access queries ("what data have we processed about this operator?").</td></tr>
+  <tr><td><strong>Code Repository Access</strong></td><td>Pipeline code (transforms) versioned in Foundry Code Repository. Only Data Engineering role can commit. All changes require code review and pass CI checks before merging.</td><td>Prevents unauthorized modification of Bronze→Silver transforms that could corrupt or exfiltrate data.</td></tr>
+  <tr><td><strong>Dataset Sharing</strong></td><td>Gold datasets shared to downstream consumers (NBO Engine, Customer Portal API) via Foundry dataset references with read-only permissions. No direct Bronze/Silver access for application teams.</td><td>Application teams see only curated Gold and Ontology views. Raw telemetry never exposed externally.</td></tr>
+</table>
+
+<!-- LAYER 4: API SECURITY -->
+<div class="page-break"></div>
+<h1>5. Layer 4 & 5 — API Gateway + OAuth 2.0 Security</h1>
+<h2>Authentication and authorization flows for all consuming applications</h2>
+
+<h3>OAuth 2.0 Flow by Client Type</h3>
+<table>
+  <tr><th>Client</th><th>OAuth Flow</th><th>Token Type</th><th>Scopes</th></tr>
+  <tr><td><strong>Customer Portal (Customer/Fleet Manager)</strong></td><td>Authorization Code + PKCE via Okta. Browser-based, no client secret in frontend.</td><td>JWT Access Token, 1 hr TTL. Refresh Token, 8 hr TTL.</td><td><code>machines:read</code> <code>alerts:read</code> <code>nbo:read</code> <code>orders:write</code></td></tr>
+  <tr><td><strong>Customer Portal (Dealer/Technician)</strong></td><td>Authorization Code + PKCE via Okta. Same flow, different role claim.</td><td>JWT, 1 hr TTL</td><td><code>machines:read:dealer-scope</code> <code>workorders:write</code> <code>nba:read</code></td></tr>
+  <tr><td><strong>NBO/NBA Engine → Machine Domain APIs</strong></td><td>Client Credentials (machine-to-machine). Client secret stored in AWS Secrets Manager, rotated every 30 days.</td><td>JWT, 15 min TTL</td><td><code>machines:read:full</code> <code>gold:read</code></td></tr>
+  <tr><td><strong>Commerce Platform → Foundry webhook</strong></td><td>Webhook HMAC-SHA256 signature validation. Commerce Platform signs payload with shared secret. Foundry endpoint verifies signature before processing.</td><td>HMAC signature, per-request</td><td>Order event write only</td></tr>
+  <tr><td><strong>OEM Internal (Analytics)</strong></td><td>Authorization Code + PKCE via Azure AD (internal SSO). Restricted to Foundry Contour/Slate dashboards.</td><td>JWT, 8 hr TTL</td><td><code>analytics:read:fleet</code></td></tr>
+</table>
+
+<h3>API Gateway Controls</h3>
+<table>
+  <tr><th>Control</th><th>Implementation</th></tr>
+  <tr><td><strong>JWT Validation</strong></td><td>API Gateway validates JWT signature (RS256), issuer, audience, and expiry on every request. Invalid tokens rejected with 401 before reaching Machine Domain APIs.</td></tr>
+  <tr><td><strong>Scope Enforcement</strong></td><td>JWT scopes checked at API Gateway. A customer token with <code>machines:read</code> cannot call the <code>/workorders</code> write endpoint even if they know the URL.</td></tr>
+  <tr><td><strong>Rate Limiting</strong></td><td>Per <code>client_id</code>: Portal users — 100 req/min. NBO Engine — 500 req/min. Burst limit 2x for 30 seconds. 429 response with Retry-After header on breach.</td></tr>
+  <tr><td><strong>WAF Rules</strong></td><td>AWS WAF: SQL injection, XSS, oversized payloads (>1MB), known bad IPs (AWS Managed Rules). Custom rules for machine serial number format validation.</td></tr>
+  <tr><td><strong>mTLS Internal</strong></td><td>Service-to-service calls (NBO Engine → Machine Domain APIs, Notification Service → SNS) use mTLS with internal CA-signed certificates. No bearer tokens for internal hops.</td></tr>
+  <tr><td><strong>API Audit Log</strong></td><td>Every API call logged: client_id, user_id (from JWT sub), endpoint, response code, latency. Shipped to CloudWatch + SIEM (Splunk/Datadog). Retained 13 months.</td></tr>
+</table>
+
+<!-- THREAT MODEL -->
+<h1>6. Threat Model — STRIDE Analysis</h1>
+
+<table>
+  <tr><th>Threat</th><th>Category</th><th>Likelihood</th><th>Control</th></tr>
+  <tr><td>Rogue machine injects false telemetry to suppress maintenance alerts</td><td>Spoofing</td><td><span class="badge b-med">Medium</span></td><td>X.509 per-device certificates + CRL revocation. MDM serial # validation at Bronze ingest.</td></tr>
+  <tr><td>Cellular MITM intercepts raw telemetry between machine and Kafka</td><td>Tampering</td><td><span class="badge b-low">Low</span></td><td>mTLS with certificate pinning on telematics unit. TLS 1.3 with forward secrecy.</td></tr>
+  <tr><td>Customer A queries machines belonging to Customer B</td><td>Information Disclosure</td><td><span class="badge b-high">High (if not controlled)</span></td><td>Foundry IAM data markings at Ontology level. Machine Domain APIs enforce customer_id scope from JWT claims.</td></tr>
+  <tr><td>Dealer modifies another dealer's work orders</td><td>Tampering</td><td><span class="badge b-med">Medium</span></td><td>Dealer scope enforced via JWT claims + Foundry markings. Work order writes validated against dealer_id claim.</td></tr>
+  <tr><td>Malicious Commerce Platform webhook replays an old order to trigger duplicate NBO model updates</td><td>Replay Attack</td><td><span class="badge b-med">Medium</span></td><td>Webhook HMAC includes timestamp. Foundry endpoint rejects payloads older than 5 minutes. Idempotency key on order_id.</td></tr>
+  <tr><td>Compromised NBO Engine client secret used to bulk-read all machine Gold data</td><td>Elevation of Privilege</td><td><span class="badge b-med">Medium</span></td><td>Client Credentials tokens TTL 15 min. Secret rotated every 30 days via Secrets Manager. Anomaly detection on bulk read patterns (>100 machines/min triggers alert).</td></tr>
+  <tr><td>Pipeline engineer modifies Bronze→Silver transform to exfiltrate raw telemetry</td><td>Information Disclosure</td><td><span class="badge b-low">Low</span></td><td>Code Repository requires 2-person review + CI gate. Foundry audit log captures all dataset writes. SIEM alerts on unusual output dataset volumes.</td></tr>
+  <tr><td>GDPR data subject requests deletion of operator telemetry</td><td>Compliance</td><td><span class="badge b-high">Certain (regulatory)</span></td><td>Operator PII tokenized at Silver. Token → raw mapping table deletable independently. Foundry dataset TTL policies for Bronze raw data.</td></tr>
+</table>
+
+<!-- KEY MANAGEMENT -->
+<h1>7. Key Management</h1>
+
+<table>
+  <tr><th>Secret / Key</th><th>Storage</th><th>Rotation</th><th>Access</th></tr>
+  <tr><td>Telematics Unit Private Keys</td><td>Hardware HSM on device</td><td>On certificate expiry (2 years) via OTA</td><td>Never leaves hardware</td></tr>
+  <tr><td>Kafka SCRAM Credentials (internal services)</td><td>AWS Secrets Manager</td><td>Every 30 days (automated Lambda rotation)</td><td>Magritte service role only</td></tr>
+  <tr><td>Foundry Dataset Encryption Keys</td><td>Foundry-managed (or AWS KMS BYOK for PII)</td><td>Annual via Foundry admin</td><td>Foundry kernel only</td></tr>
+  <tr><td>OAuth Client Secrets (NBO Engine, etc.)</td><td>AWS Secrets Manager</td><td>Every 30 days (automated)</td><td>Service IAM role only. Never in code or env vars.</td></tr>
+  <tr><td>Commerce Platform Webhook HMAC Secret</td><td>AWS Secrets Manager</td><td>Every 90 days (manual coordination with commerce vendor)</td><td>Foundry webhook receiver Lambda only</td></tr>
+  <tr><td>JWT Signing Keys (Okta)</td><td>Okta HSM</td><td>Okta-managed, automatic</td><td>Okta only. Public JWKS endpoint for API Gateway validation.</td></tr>
+  <tr><td>API Gateway TLS Certificates</td><td>AWS Certificate Manager</td><td>Auto-renewed by ACM 60 days before expiry</td><td>API Gateway service</td></tr>
+</table>
+
+<!-- COMPLIANCE -->
+<h1>8. Compliance & Data Privacy</h1>
+
+<table>
+  <tr><th>Regulation</th><th>Applicability</th><th>Controls in Place</th></tr>
+  <tr><td><strong>GDPR</strong></td><td>EU machine operators, EU dealer employees. Any telemetry linked to an identifiable individual (operator GPS, login events).</td><td>PII tokenization at Silver. Bronze raw data retained max 90 days. Right-to-erasure via token mapping deletion. Data Processing Agreements with Palantir and AWS. Foundry hosted in EU region for EU data.</td></tr>
+  <tr><td><strong>CCPA</strong></td><td>California-based customers and dealers.</td><td>Opt-out mechanism for telemetry-linked recommendations. Data inventory maintained in Foundry catalog. Consumer request workflow via Customer Portal.</td></tr>
+  <tr><td><strong>SOC 2 Type II</strong></td><td>Palantir Foundry is SOC 2 Type II certified. AWS is SOC 2 Type II. the OEM's own controls reviewed annually.</td><td>Annual third-party audit. Foundry and AWS audit reports available under NDA for customer due diligence.</td></tr>
+  <tr><td><strong>Data Residency</strong></td><td>Some markets (EU, potentially India, Brazil) require data to stay in-country.</td><td>Foundry multi-region deployment. EU telemetry processed in EU Foundry instance. Cross-region data transfer prohibited by IAM marking on EU-tagged datasets.</td></tr>
+  <tr><td><strong>OT / Industrial Security</strong></td><td>Machine firmware OTA updates, CAN bus signal integrity.</td><td>Signed OTA firmware (code signing cert). CAN bus signals not exposed outside telematics unit. NIST CSF framework applied to OT/IT boundary.</td></tr>
+</table>
+
+<br><br><hr>
+<p style="text-align:center;color:#999;font-size:11px;">Security Architecture — Machine Telemetry Platform &nbsp;|&nbsp; Harsh Shah &nbsp;|&nbsp; May 2026</p>
+</body>
+</html>
